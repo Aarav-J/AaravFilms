@@ -1,10 +1,11 @@
 'use client';
 
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Html, Text, RoundedBox, useGLTF } from '@react-three/drei';
+import { RoundedBox } from '@react-three/drei';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { films, type Film, type Viewing } from '@/data/films';
+import ReferenceRoom, { BAY_CAPACITY } from './ReferenceRoom';
 
 type Mode = 'room' | 'case' | 'confirm' | 'inserting' | 'playing' | 'review' | 'catalog' | 'tickets';
 
@@ -26,132 +27,6 @@ function latestViewingTime(film: Film) {
 }
 
 const compactTicketDate = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' });
-
-const CRT_MODEL_PATH = '/models/crt-tv-voxel.glb';
-const MODEL_PATHS = {
-  filmReel: '/models/film-reel.glb',
-  dvdPlayer: '/models/dvd-player.glb',
-  popcorn: '/models/popcorn-box.glb',
-  rug: '/models/rug.glb',
-  gizmo: '/models/gizmo.glb',
-  delorean: '/models/delorean.glb',
-  spot: '/models/spot.glb',
-  chessGantry: '/models/chess-gantry.glb',
-  tssBatch: '/models/tss-batch-0002.glb',
-  medievalBookshelf: '/models/medieval-bookshelves.glb',
-  dvdCase: '/models/dvd-case.glb'
-} as const;
-
-function Block({
-  position,
-  rotation = [0, 0, 0],
-  size,
-  color,
-  roughness = 0.9,
-  metalness = 0,
-  onClick
-}: {
-  position: [number, number, number];
-  rotation?: [number, number, number];
-  size: [number, number, number];
-  color: string;
-  roughness?: number;
-  metalness?: number;
-  onClick?: () => void;
-}) {
-  return (
-    <mesh position={position} rotation={rotation} onClick={onClick} castShadow receiveShadow>
-      <boxGeometry args={size} />
-      <meshStandardMaterial color={color} roughness={roughness} metalness={metalness} />
-    </mesh>
-  );
-}
-
-function ImportedModel({
-  path,
-  position = [0, 0, 0],
-  rotation = [0, 0, 0],
-  scale = 1
-}: {
-  path: string;
-  position?: [number, number, number];
-  rotation?: [number, number, number];
-  scale?: number;
-}) {
-  const { scene } = useGLTF(path);
-  const model = useMemo(() => {
-    const clone = scene.clone(true);
-    clone.traverse((object) => {
-      if (object instanceof THREE.Mesh) {
-        object.castShadow = true;
-        object.receiveShadow = true;
-      }
-    });
-    return clone;
-  }, [scene]);
-
-  return <primitive object={model} position={position} rotation={rotation} scale={scale} />;
-}
-
-// Warm walnut material colours keyed to mesh name fragment
-const WALNUT_DARK  = '#4a2810';
-const WALNUT_MID   = '#6b3918';
-const WALNUT_LIGHT = '#9c5c2e';
-
-function BookshelfModel({
-  position = [0, 0, 0],
-  rotation = [0, 0, 0],
-  scale = 1
-}: {
-  position?: [number, number, number];
-  rotation?: [number, number, number];
-  scale?: number;
-}) {
-  const { scene } = useGLTF(MODEL_PATHS.medievalBookshelf);
-  const model = useMemo(() => {
-    const clone = scene.clone(true);
-    clone.traverse((object) => {
-      if (!(object instanceof THREE.Mesh)) return;
-      object.castShadow = true;
-      object.receiveShadow = true;
-      const n = object.name.toLowerCase();
-      const col = n.includes('shelf') || n.includes('top') || n.includes('under')
-        ? WALNUT_LIGHT
-        : n.includes('leg') || n.includes('base') || n.includes('beam')
-          ? WALNUT_DARK
-          : WALNUT_MID;
-      object.material = new THREE.MeshStandardMaterial({
-        color: col,
-        roughness: 0.74,
-        metalness: 0.02,
-        envMapIntensity: 0.6,
-      });
-    });
-    return clone;
-  }, [scene]);
-
-  return <primitive object={model} position={position} rotation={rotation} scale={scale} />;
-}
-
-// ── DVD case model: spine + disc + front cover painted per-film via canvas ──
-// Raw model bounds: size=[0.1351, 0.19, 0.014] (W×H×Thickness), center=[0,0.095,0].
-//
-// Spine_Art_Plane sits at local x=-0.0675 (the left/thin edge) — its normal
-// faces -X. After rotation=[0,π/2,0] that normal maps to world +Z (camera),
-// local Y (height) is untouched, and local Z (thickness, 0.014) becomes the
-// WORLD-X axis — i.e. the spacing between neighboring cases on a shelf.
-//
-// The model's real 14mm thickness is far too thin to read as a shelf pitch,
-// so each local axis is scaled independently (scale applies before rotation
-// in THREE's TRS composition, so this is safe):
-//   scale.y → case height
-//   scale.z → spine width / stacking pitch (what WAS 0.014 becomes this)
-//   scale.x → how deep the case sits into the shelf
-const CASE_HEIGHT_SCALE = 5.0;   // 0.19   * 5.0  = 0.95  (case height)
-const CASE_THICK_SCALE  = 16.0;  // 0.014  * 16.0 = 0.224 (shelf pitch / spine width)
-const CASE_DEPTH_SCALE  = 4.2;   // 0.1351 * 4.2  = 0.567 (depth into shelf)
-const CASE_SCALE: [number, number, number] = [CASE_DEPTH_SCALE, CASE_HEIGHT_SCALE, CASE_THICK_SCALE];
-const DVD_CASE_CENTER_Y = 0.095; // raw local center height, pre-scale
 
 // Shared texture cache so repeated films across many shelf instances don't
 // regenerate identical canvases.
@@ -284,213 +159,38 @@ function makeCoverTexture(film: Film): THREE.CanvasTexture {
   return tex;
 }
 
-function paintCaseMaterials(clone: THREE.Object3D, film: Film) {
-  const spineTex = cachedTexture(`spine-${film.id}`, () => makeSpineTexture(film));
-  const discTex  = cachedTexture(`disc-${film.id}`,  () => makeDiscTexture(film));
-  const coverTex = cachedTexture(`cover-${film.id}`, () => makeCoverTexture(film));
-
-  clone.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return;
-    object.castShadow = true;
-    object.receiveShadow = true;
-    if (object.name === 'Spine_Art_Plane') {
-      object.material = new THREE.MeshStandardMaterial({ map: spineTex, roughness: 0.55, metalness: 0.02, side: THREE.DoubleSide });
-    } else if (object.name === 'Cylinder') {
-      object.material = new THREE.MeshStandardMaterial({ map: discTex, roughness: 0.3, metalness: 0.65, side: THREE.DoubleSide });
-    } else if (object.name === 'Case_Back') {
-      object.material = new THREE.MeshStandardMaterial({ map: coverTex, roughness: 0.5, metalness: 0.02, side: THREE.DoubleSide });
-    } else {
-      object.material = new THREE.MeshStandardMaterial({ color: '#141210', roughness: 0.42, metalness: 0.1, side: THREE.DoubleSide });
-    }
-  });
-}
-
-function DvdCase3D({ film }: { film: Film }) {
-  const { scene } = useGLTF(MODEL_PATHS.dvdCase);
-
-  const model = useMemo(() => {
-    const clone = scene.clone(true);
-    paintCaseMaterials(clone, film);
-    return clone;
-  }, [scene, film]);
-
-  return (
-    <primitive
-      object={model}
-      rotation={[0, Math.PI / 2, 0]}
-      scale={CASE_SCALE}
-      position={[0, -DVD_CASE_CENTER_Y * CASE_HEIGHT_SCALE, 0]}
-    />
-  );
-}
-
-// ── Case inspection rig: the real GLB case, openable + a spinning disc ──
-// Closed: rotation.y = π makes Case_Back (front cover) face the camera.
-// Opening: the shell (everything except the disc) swings further around the
-// hinge pivot (the spine edge, local x=-0.0675) while the disc undocks
-// forward and begins spinning around its own face-normal (Z) axis.
-const CASE_HINGE_LOCAL_X = -0.0675;
-const CASE_CLOSED_YAW = Math.PI;
-const CASE_OPEN_YAW_DELTA = -1.85;
-
-function DvdCaseRig({
-  film,
-  open,
-  inserting,
-  onToggleOpen,
-  onDiscClick
-}: {
-  film: Film;
-  open: boolean;
-  inserting: boolean;
-  onToggleOpen: () => void;
-  onDiscClick: () => void;
+function CaseStage({ film, open, inserting, onToggleOpen, onDiscClick }: {
+  film: Film; open: boolean; inserting: boolean; onToggleOpen: () => void; onDiscClick: () => void;
 }) {
-  const { scene } = useGLTF(MODEL_PATHS.dvdCase);
-
-  const { shell, disc } = useMemo(() => {
-    const clone = scene.clone(true);
-    paintCaseMaterials(clone, film);
-    const discObj = clone.getObjectByName('Cylinder') ?? null;
-    if (discObj && discObj.parent) discObj.parent.remove(discObj);
-    return { shell: clone, disc: discObj };
-  }, [scene, film]);
-
-  const openAmount = useRef(0);
-  const spin = useRef(0);
-  const shellPivotRef = useRef<THREE.Group>(null);
-  const discGroupRef = useRef<THREE.Group>(null);
-
-  useFrame((_, dt) => {
-    openAmount.current = THREE.MathUtils.damp(openAmount.current, open ? 1 : 0, 3.6, dt);
-    const t = openAmount.current;
-
-    if (shellPivotRef.current) {
-      shellPivotRef.current.rotation.y = CASE_CLOSED_YAW + t * CASE_OPEN_YAW_DELTA;
-    }
-
-    if (discGroupRef.current) {
-      discGroupRef.current.position.x = THREE.MathUtils.lerp(0, -0.18, t);
-      discGroupRef.current.position.y = THREE.MathUtils.lerp(0, 0.06, t);
-      discGroupRef.current.position.z = THREE.MathUtils.lerp(0, 0.62, t);
-      const spinSpeed = 0.5 + t * 1.6 + (inserting ? 4.5 : 0);
-      spin.current += dt * spinSpeed;
-      discGroupRef.current.rotation.z = spin.current;
-      const reveal = Math.min(1, t * 3);
-      discGroupRef.current.scale.setScalar(THREE.MathUtils.lerp(0.001, 1, reveal));
-      discGroupRef.current.visible = reveal > 0.02;
-    }
-  });
-
-  return (
-    <group>
-      <group
-        ref={shellPivotRef}
-        position={[CASE_HINGE_LOCAL_X * CASE_DEPTH_SCALE, 0, 0]}
-        onClick={(event) => {
-          event.stopPropagation();
-          if (!open) onToggleOpen();
-        }}
-        onPointerOver={() => { if (!open) document.body.style.cursor = 'pointer'; }}
-        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
-      >
-        <primitive
-          object={shell}
-          position={[-CASE_HINGE_LOCAL_X * CASE_DEPTH_SCALE, -DVD_CASE_CENTER_Y * CASE_HEIGHT_SCALE, 0]}
-          scale={CASE_SCALE}
-        />
-      </group>
-      {disc && (
-        <group ref={discGroupRef}>
-          <primitive
-            object={disc}
-            scale={CASE_SCALE}
-            onClick={(event: THREE.Event & { stopPropagation: () => void }) => {
-              event.stopPropagation();
-              if (open) onDiscClick();
-            }}
-            onPointerOver={() => { if (open) document.body.style.cursor = 'pointer'; }}
-            onPointerOut={() => { document.body.style.cursor = 'auto'; }}
-          />
-          {/* generous invisible hitbox so the thin disc is easy to click */}
-          <mesh
-            onClick={(event) => { event.stopPropagation(); if (open) onDiscClick(); }}
-            onPointerOver={() => { if (open) document.body.style.cursor = 'pointer'; }}
-            onPointerOut={() => { document.body.style.cursor = 'auto'; }}
-          >
-            <circleGeometry args={[0.42, 24]} />
-            <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
-          </mesh>
-        </group>
-      )}
+  const cover = useMemo(() => makeCoverTexture(film), [film]);
+  const label = useMemo(() => makeDiscTexture(film), [film]);
+  return <Canvas dpr={[1, 1.5]} camera={{ position: [0, 0, 2.8], fov: 36 }} gl={{ antialias: true }}>
+    <color attach="background" args={['#120a06']} />
+    <ambientLight intensity={1.2} color="#ffdec1" />
+    <directionalLight position={[2, 3, 4]} intensity={2} color="#ffd9ab" />
+    <group position={[open ? -.34 : 0, 0, 0]} rotation={[0, open ? -.7 : -.12, 0]} onClick={e => { e.stopPropagation(); onToggleOpen(); }}>
+      <RoundedBox args={[.86, 1.2, .09]} radius={.025} smoothness={3}><meshStandardMaterial color="#191815" roughness={.7} /></RoundedBox>
+      <mesh position={[0, 0, .052]}><planeGeometry args={[.8, 1.14]} /><meshStandardMaterial map={cover} roughness={.8} /></mesh>
     </group>
-  );
-}
-
-function CaseStage({
-  film,
-  open,
-  inserting,
-  onToggleOpen,
-  onDiscClick
-}: {
-  film: Film;
-  open: boolean;
-  inserting: boolean;
-  onToggleOpen: () => void;
-  onDiscClick: () => void;
-}) {
-  return (
-    <Canvas shadows dpr={[1, 1.7]} camera={{ position: [0, 0.1, 2.35], fov: 36 }} gl={{ antialias: true }}>
-      <color attach="background" args={['#120a06']} />
-      <ambientLight intensity={0.58} color="#ffcf9a" />
-      <directionalLight position={[1.4, 2.0, 2.3]} intensity={1.55} color="#ffd9ab" castShadow shadow-mapSize={[512, 512]} />
-      <pointLight position={[-1.1, 0.9, 1.5]} intensity={12} distance={6} color="#ff9a44" />
-      <Suspense fallback={null}>
-        <DvdCaseRig film={film} open={open} inserting={inserting} onToggleOpen={onToggleOpen} onDiscClick={onDiscClick} />
-      </Suspense>
-    </Canvas>
-  );
+    {open && <mesh position={[.36, 0, .35]} rotation={[0, -.15, inserting ? .5 : 0]} onClick={e => { e.stopPropagation(); onDiscClick(); }}>
+      <ringGeometry args={[.045, .4, 64]} /><meshStandardMaterial map={label} color="#e4dac8" metalness={.45} roughness={.3} side={THREE.DoubleSide} />
+    </mesh>}
+  </Canvas>;
 }
 
 function CameraRig({ mode, dragAngle }: { mode: Mode; dragAngle: React.MutableRefObject<number> }) {
-  const { camera, pointer } = useThree();
-  const target = useMemo(() => new THREE.Vector3(), []);
-
-  // Orbit pivot sits at the room centre-back; radius = distance to default camera position
-  const PIVOT_Z = 3.5;
-  const RADIUS  = 12.5; // camera at z=16 = pivot(3.5) + radius(12.5)
-
+  const { camera, pointer, size } = useThree();
+  const target = useMemo(() => new THREE.Vector3(0, 2.9, 0), []);
   useFrame((_, dt) => {
-    const roomLike = mode === 'room' || mode === 'catalog' || mode === 'tickets'
-                  || mode === 'case'  || mode === 'confirm';
-
-    let desired: THREE.Vector3;
-    let look:    THREE.Vector3;
-
-    if (roomLike) {
-      // Drag angle orbits the camera; pointer.x adds a tiny live parallax on top
-      const angle = dragAngle.current + pointer.x * 0.04;
-      const cx = Math.sin(angle) * RADIUS;
-      const cz = PIVOT_Z + Math.cos(angle) * RADIUS;
-      const cy = 2.2 + pointer.y * 0.4;
-      desired = new THREE.Vector3(cx, cy, cz);
-      // Look slightly past the pivot in the opposite-X direction so side shelves reveal naturally
-      // Lead the look-at strongly opposite to the camera X so side shelves enter frame
-      look = new THREE.Vector3(Math.sin(angle) * -5.0, 2.0 + pointer.y * 0.25, 0.0);
-    } else if (mode === 'inserting') {
-      desired = new THREE.Vector3(1.55, 1.38, 5.7);
-      look    = new THREE.Vector3(2.85, 1.12, 1.05);
-    } else {
-      desired = new THREE.Vector3(3.15, 1.52, 6.25);
-      look    = new THREE.Vector3(3.05, 1.45, 0.7);
-    }
-
-    camera.position.lerp(desired, 1 - Math.exp(-dt * 2.7));
-    target.lerp(look,            1 - Math.exp(-dt * 3.2));
-    camera.lookAt(target);
+    const close = mode === 'inserting' || mode === 'playing' || mode === 'review';
+    const extraBays = Math.max(0, Math.ceil(films.length / BAY_CAPACITY) - 1);
+    const aspect = size.width / size.height;
+    const angle = dragAngle.current + pointer.x * .014;
+    const distance = Math.max(12.8, (6 + extraBays * 3.8) / (Math.tan(THREE.MathUtils.degToRad(43 / 2)) * aspect));
+    const desired = close ? new THREE.Vector3(4.9, 2.6, 6.4) : new THREE.Vector3(2.4 + Math.sin(angle) * 7, 3.6 + pointer.y * .05, distance);
+    const look = close ? new THREE.Vector3(3.4, 1.4, .8) : new THREE.Vector3(-extraBays * 3.6, 2.85, 0);
+    camera.position.lerp(desired, 1 - Math.exp(-dt * 3)); target.lerp(look, 1 - Math.exp(-dt * 3)); camera.lookAt(target);
   });
-
   return null;
 }
 
@@ -543,334 +243,6 @@ function DragLook({ dragAngle }: { dragAngle: React.MutableRefObject<number> }) 
   return null;
 }
 
-function DvdSpine({ film, x, y, z, idx, onSelect }: {
-  film: Film; x: number; y: number; z: number; idx: number; onSelect: () => void;
-}) {
-  const [hover, setHover] = useState(false);
-  const ref = useRef<THREE.Group>(null);
-
-  useFrame((_, dt) => {
-    if (!ref.current) return;
-    ref.current.position.z = THREE.MathUtils.damp(ref.current.position.z, hover ? z + 0.18 : z, 12, dt);
-    ref.current.rotation.y = THREE.MathUtils.damp(ref.current.rotation.y, hover ? -0.1 : 0, 12, dt);
-  });
-
-  return (
-    <group
-      ref={ref}
-      position={[x, y, z]}
-      onClick={(event) => { event.stopPropagation(); onSelect(); }}
-      onPointerOver={(event) => { event.stopPropagation(); setHover(true); document.body.style.cursor = 'pointer'; }}
-      onPointerOut={() => { setHover(false); document.body.style.cursor = 'auto'; }}
-    >
-      {/* generous invisible hitbox — real case geometry is thin on the spine axis */}
-      <mesh position={[0, 0.475, CASE_DEPTH_SCALE * 0.0676]} onClick={(event) => { event.stopPropagation(); onSelect(); }}>
-        <boxGeometry args={[CASE_THICK_SCALE * 0.03, CASE_HEIGHT_SCALE * 0.19 + 0.12, CASE_DEPTH_SCALE * 0.1351 + 0.12]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
-      <DvdCase3D film={film} />
-      {hover && (
-        <Html position={[0, 0.72, 0.16]} center distanceFactor={7}>
-          <div className="hover-label">
-            {film.title}
-            <small>Open case</small>
-          </div>
-        </Html>
-      )}
-    </group>
-  );
-}
-
-function CoverFace({ film, position }: { film: Film; position: [number, number, number] }) {
-  return (
-    <group position={position}>
-      <RoundedBox args={[0.86, 1.16, 0.06]} radius={0.018} smoothness={3} castShadow receiveShadow>
-        <meshStandardMaterial color={film.color} roughness={0.62} />
-      </RoundedBox>
-      <Text position={[0, 0.12, 0.04]} maxWidth={0.68} fontSize={0.11} lineHeight={1.06} textAlign="center" color={film.accent}>
-        {film.title}
-      </Text>
-      <Text position={[0, -0.38, 0.04]} fontSize={0.048} color="#f7dfb8">
-        {film.year}
-      </Text>
-    </group>
-  );
-}
-
-function MediaShelf({ onSelect }: { onSelect: (film: Film) => void }) {
-  // scale=0.72 → width=8.42, height=7.78, depth=2.03
-  // Local center at scale=0.72: x=-5.34, y=3.89, z=-5.51
-  //
-  // Back wall: center at x=0, front face z≈-0.5
-  //   px = 5.34, pz = -0.5 + 0.72*6.242 = 3.99
-  //
-  // Left wall (R_y+π/2, back at x=−9):
-  //   local_z_back*0.72=-6.53 → px=-9+6.53=-2.47
-  //   world_z_center=2.5 → pz=2.5-5.34=-2.84
-  //
-  // Right wall (R_y−π/2, back at x=+9):
-  //   px=9-6.53=2.47,  pz=2.5+5.34=7.84
-
-  const S = 0.72;
-  // Real case footprint after non-uniform scale: thickness(pitch)=0.224, height=0.95
-  const COLS = 24;
-  const ROWS = 4;
-  const CASE_W = 0.25;
-  const CASE_H = 1.05;
-  const spineEntries = Array.from({ length: COLS * ROWS }, (_, idx) => ({
-    film: films[idx % films.length],
-    x: -(COLS - 1) * CASE_W * 0.5 + (idx % COLS) * CASE_W,
-    y: 4.3 - Math.floor(idx / COLS) * CASE_H,
-    z: -0.40,
-    idx,
-  }));
-
-  return (
-    <group>
-      {/* ── Back wall ─────────────────────────────── */}
-      <BookshelfModel position={[5.34, 0, 3.99]} scale={S} />
-
-      {/* ── Left wall ─────────────────────────────── */}
-      <BookshelfModel position={[-2.47, 0, -2.84]} rotation={[0, Math.PI / 2, 0]} scale={S} />
-
-      {/* ── Right wall ────────────────────────────── */}
-      <BookshelfModel position={[2.47, 0, 7.84]} rotation={[0, -Math.PI / 2, 0]} scale={S} />
-
-      {/* ── Interactive DVD spines on back wall ───── */}
-      {spineEntries.map(({ film, x, y, z, idx }) => (
-        <DvdSpine key={idx} film={film} x={x} y={y} z={z} idx={idx} onSelect={() => onSelect(film)} />
-      ))}
-
-      <CoverFace film={films[0]}  position={[-3.4, 2.32, -0.38]} />
-      <CoverFace film={films[6]}  position={[-3.4, 1.28, -0.38]} />
-      <CoverFace film={films[10]} position={[-3.4, 0.22, -0.38]} />
-
-      <Text position={[0, 6.0, -0.85]} fontSize={0.16} letterSpacing={0.14} color="#e2bd80">
-        AARAV'S FILMS
-      </Text>
-    </group>
-  );
-}
-
-function CardCatalog({ onClick }: { onClick: () => void }) {
-  return (
-    <group
-      position={[-3.8, 0, 4.2]}
-      onClick={(event) => {
-        event.stopPropagation();
-        onClick();
-      }}
-      onPointerOver={() => (document.body.style.cursor = 'pointer')}
-      onPointerOut={() => (document.body.style.cursor = 'auto')}
-    >
-      <Block position={[0, 0.7, 0]} size={[1.08, 1.38, 0.78]} color="#633a22" />
-      {[0, 1, 2].map((i) => (
-        <group key={i}>
-          <Block position={[0, 0.31 + i * 0.39, 0.43]} size={[0.96, 0.31, 0.06]} color="#935830" />
-          <Block position={[0, 0.31 + i * 0.39, 0.475]} size={[0.23, 0.058, 0.015]} color="#d7a968" metalness={0.8} />
-        </group>
-      ))}
-      <Text position={[0, 1.55, 0.28]} fontSize={0.1} color="#f2d8ab">
-        CATALOG
-      </Text>
-    </group>
-  );
-}
-
-function TicketBox({ onClick }: { onClick: () => void }) {
-  return (
-    <group
-      position={[-2.2, 0, 5.0]}
-      onClick={(event) => {
-        event.stopPropagation();
-        onClick();
-      }}
-      onPointerOver={() => (document.body.style.cursor = 'pointer')}
-      onPointerOut={() => (document.body.style.cursor = 'auto')}
-    >
-      <Block position={[0, 0.36, 0]} size={[1.2, 0.5, 0.72]} color="#8a4a28" />
-      <Block position={[0, 0.67, -0.06]} size={[1.25, 0.11, 0.78]} color="#b0723b" />
-      <Text position={[0, 0.39, 0.37]} fontSize={0.09} color="#f4dcb1">
-        TICKETS
-      </Text>
-    </group>
-  );
-}
-
-function RoomShell() {
-  return (
-    <group>
-      {/* back wall — wider and pushed deeper */}
-      <Block position={[0, 4.5, -4.0]} size={[26, 11, 0.28]} color="#2e1d12" />
-      {/* side walls — taller and running the full depth */}
-      <Block position={[-9.0, 4.5, 4.5]} size={[0.28, 11, 28]} color="#1e1410" />
-      <Block position={[ 9.0, 4.5, 4.5]} size={[0.28, 11, 28]} color="#221510" />
-      {/* floor */}
-      <Block position={[0, -0.12, 4.5]} size={[26, 0.2, 32]} color="#3c2214" />
-      {/* floor planks */}
-      {[-8, -5, -2.5, 0, 2.5, 5, 8].map((x) => (
-        <Block key={x} position={[x, -0.005, 4.5]} size={[0.022, 0.016, 31]} color="#4f2d18" />
-      ))}
-      {/* ceiling — adds the enclosed library feel */}
-      <Block position={[0, 9.6, 4.5]} size={[26, 0.3, 32]} color="#1c110c" />
-      {/* rug */}
-      <mesh position={[0.8, -0.035, 5.5]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <circleGeometry args={[4.0, 64]} />
-        <meshStandardMaterial color="#5b4434" roughness={0.98} />
-      </mesh>
-      <mesh position={[0.8, -0.025, 5.5]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <circleGeometry args={[3.0, 64]} />
-        <meshStandardMaterial color="#654735" roughness={0.98} />
-      </mesh>
-    </group>
-  );
-}
-
-
-function GizmoFigure({ position, scale = 1, rotation = [0, 0, 0] }: { position: [number, number, number]; scale?: number; rotation?: [number, number, number] }) {
-  return (
-    <group position={position} rotation={rotation} scale={scale}>
-      <ImportedModel path={MODEL_PATHS.gizmo} />
-    </group>
-  );
-}
-
-function DvdPlayer({ position, rotation = [0, 0, 0] }: { position: [number, number, number]; rotation?: [number, number, number] }) {
-  return (
-    <group position={position} rotation={rotation}>
-      <ImportedModel path={MODEL_PATHS.dvdPlayer} scale={0.001} />
-    </group>
-  );
-}
-
-function RoomRug() {
-  return (
-    <group position={[1.2, 0.002, 5.8]} rotation={[0, Math.PI / 6, 0]}>
-      <ImportedModel path={MODEL_PATHS.rug} scale={1.42} />
-    </group>
-  );
-}
-
-function PopcornCup({ position }: { position: [number, number, number] }) {
-  return (
-    <group position={position} rotation={[0, -0.25, 0]} scale={0.45}>
-      <ImportedModel path={MODEL_PATHS.popcorn} />
-    </group>
-  );
-}
-
-function DeLorean({ position, rotation = [0, 0, 0] }: { position: [number, number, number]; rotation?: [number, number, number] }) {
-  return (
-    // Model center Y=-0.077, half-height=0.8 → bottom at -0.877. At scale=0.17, bottom=-0.149 → lift by 0.15
-    <group position={position} rotation={rotation}>
-      <ImportedModel path={MODEL_PATHS.delorean} scale={0.17} position={[0, 0.15, 0]} />
-    </group>
-  );
-}
-
-
-function ReelLamp() {
-  // Stands on the floor at world [4.82, 0, 1.9] — right of TV, visible from camera
-  return (
-    <group position={[4.6, 0, 3.4]} rotation={[0, -0.35, 0]}>
-      {/* warm amber bulb tucked inside the reel hub */}
-      <pointLight position={[0, 1.62, 0.08]} intensity={52} distance={5.2} color="#ff9e47" />
-      {/* the film reel — rotate 90° on X so it stands upright like a wheel */}
-      <group position={[0, 1.58, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <ImportedModel path={MODEL_PATHS.filmReel} scale={0.72} />
-      </group>
-      {/* glowing bulb at the centre */}
-      <mesh position={[0, 1.58, 0.04]}>
-        <sphereGeometry args={[0.14, 20, 14]} />
-        <meshStandardMaterial color="#ffbf69" emissive="#ff8a2f" emissiveIntensity={3.2} />
-      </mesh>
-      {/* halo disc */}
-      <mesh position={[0, 1.58, 0.08]} rotation={[0, 0, 0]}>
-        <circleGeometry args={[0.38, 48]} />
-        <meshBasicMaterial color="#ffb160" transparent opacity={0.1} side={THREE.DoubleSide} />
-      </mesh>
-      {/* pole */}
-      <Block position={[0, 0.82, 0]} size={[0.07, 1.64, 0.07]} color="#4b3225" metalness={0.45} roughness={0.5} />
-      {/* weighted base */}
-      <Block position={[0, 0.04, 0]} size={[0.62, 0.08, 0.42]} color="#3e2a1c" metalness={0.4} roughness={0.55} />
-    </group>
-  );
-}
-
-function VoxelCrt({ active }: { active: boolean }) {
-  const { scene } = useGLTF(CRT_MODEL_PATH);
-  const model = useMemo(() => {
-    const clone = scene.clone(true);
-    clone.traverse((object) => {
-      if (object instanceof THREE.Mesh) {
-        object.castShadow = true;
-        object.receiveShadow = true;
-      }
-    });
-    return clone;
-  }, [scene]);
-
-  return (
-    <group>
-      <primitive object={model} position={[1.55, -0.04, 0.86]} scale={0.14} />
-      {active && <pointLight position={[-0.24, 0.64, 0.68]} intensity={9} distance={2.2} color="#f19a54" />}
-    </group>
-  );
-}
-
-useGLTF.preload(CRT_MODEL_PATH);
-Object.values(MODEL_PATHS).forEach((p) => useGLTF.preload(p));
-
-function Television({ active, onClick }: { active: boolean; onClick: () => void }) {
-  return (
-    <group
-      position={[3.86, 0, 1.2]}
-      rotation={[0, -0.08, 0]}
-      onClick={(event) => {
-        event.stopPropagation();
-        onClick();
-      }}
-      onPointerOver={() => (document.body.style.cursor = 'pointer')}
-      onPointerOut={() => (document.body.style.cursor = 'auto')}
-    >
-      <VoxelCrt active={active} />
-      <mesh position={[-0.24, 0.64, 0.56]}>
-        <planeGeometry args={[1.03, 0.62]} />
-        <meshBasicMaterial color={active ? '#d89a55' : '#d8f0eb'} transparent opacity={active ? 0.18 : 0.16} />
-      </mesh>
-      <Text position={[-0.24, 0.65, 0.59]} fontSize={0.092} color={active ? '#f1c88e' : '#26312f'}>
-        {active ? 'DVD MENU' : 'STATIC'}
-      </Text>
-      <Block position={[0, -0.11, 0.12]} size={[2.05, 0.2, 1.04]} color="#704528" />
-      <Block position={[-0.22, -0.02, 0.66]} size={[1.1, 0.05, 0.035]} color="#17100d" />
-      <Block position={[0.52, -0.01, 0.67]} size={[0.08, 0.055, 0.035]} color={active ? '#f3a142' : '#433226'} />
-      <Text position={[0.35, -0.035, 0.69]} fontSize={0.048} color="#ddc89c">
-        DISC PLAYER
-      </Text>
-    </group>
-  );
-}
-
-
-
-function RoomProps() {
-  return (
-    <group>
-      {/* popcorn — beside lamp on floor */}
-      <PopcornCup position={[5.0, 0.51, 3.8]} />
-      {/* large gizmo — center floor, faces camera */}
-      <GizmoFigure position={[1.8, 0, 5.2]} scale={1.1} rotation={[0, 2.6, 0]} />
-      {/* small gizmo — right side near TV */}
-      <GizmoFigure position={[4.6, 0, 4.6]} scale={0.7} rotation={[0, -1.2, 0]} />
-      {/* DVD player flat on floor in front of TV, like a VCR */}
-      <DvdPlayer position={[3.2, 0.054, 1.0]} rotation={[0, 0, 0]} />
-      {/* DeLorean toy — visible center-right floor */}
-      <DeLorean position={[3.0, 0, 4.2]} rotation={[0, -0.3, 0]} />
-    </group>
-  );
-}
-
-
 function Scene({
   mode,
   selected,
@@ -892,33 +264,14 @@ function Scene({
 }) {
   const dragAngle = useRef(0);
   return (
-    <Canvas shadows dpr={[1, 1.7]} camera={{ position: [0, 2.4, 16], fov: 52 }} gl={{ antialias: true }}>
-      <color attach="background" args={['#1a100c']} />
-      <fog attach="fog" args={['#1a100c', 14, 30]} />
-      <ambientLight intensity={0.62} color="#ffcfa0" />
-      <directionalLight position={[-5, 8, 5]} intensity={1.4} color="#ffd4a8" castShadow shadow-mapSize={[1024, 1024]} />
-      {/* reel lamp warm key */}
-      <pointLight position={[3.7, 1.7, 1.2]} intensity={45} distance={7}  color="#ff9a44" />
-      {/* ambient fill — left side */}
-      <pointLight position={[-5.0, 3.0, 4.0]} intensity={20} distance={10} color="#d8662e" />
-      {/* shelf fill — back wall */}
-      <pointLight position={[0, 5.5, 4.5]}   intensity={28} distance={12} color="#ffcf9a" />
-      {/* shelf fill — left wall shelf */}
-      <pointLight position={[-5.0, 4.5, 2.5]} intensity={20} distance={9}  color="#ffbb80" />
-      {/* shelf fill — right wall shelf */}
-      <pointLight position={[ 5.0, 4.5, 2.5]} intensity={20} distance={9}  color="#ffbb80" />
+    <Canvas shadows dpr={[1, 1.5]} camera={{ position: [2.4, 3.6, 12.8], fov: 43 }} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2 }}>
+      <color attach="background" args={['#171310']} />
+      <ambientLight intensity={.45} color="#b5b7b6" />
+      <directionalLight position={[-4, 7, 6]} intensity={.65} color="#dfc5a3" castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-10} shadow-camera-right={10} shadow-camera-top={10} shadow-camera-bottom={-5} shadow-bias={-.0005} />
+      <pointLight position={[-3, 4.4, 3.5]} intensity={14} color="#d6ab76" distance={12} />
       <CameraRig mode={mode} dragAngle={dragAngle} />
       <DragLook dragAngle={dragAngle} />
-      <ReelLamp />
-
-      <RoomShell />
-
-      <MediaShelf onSelect={onSelect} />
-      <CardCatalog onClick={onCatalog} />
-      <TicketBox onClick={onTickets} />
-      <Television active={mode === 'inserting' || mode === 'playing' || mode === 'review'} onClick={onPlayer} />
-      <RoomRug />
-      <RoomProps />
+      <ReferenceRoom onSelect={onSelect} active={mode === 'inserting' || mode === 'playing' || mode === 'review'} onPlayer={onPlayer} />
     </Canvas>
   );
 }
@@ -1000,7 +353,7 @@ export default function FilmRoom() {
 
   return (
     <main className="cinema">
-      <Suspense fallback={<div className="loading">Preparing the screening room...</div>}>
+      {!(mode === 'case' || mode === 'confirm' || mode === 'inserting') && <Suspense fallback={<div className="loading">Preparing the screening room...</div>}>
         <Scene
           mode={mode}
           selected={selected}
@@ -1011,14 +364,14 @@ export default function FilmRoom() {
           onDisc={() => setMode('confirm')}
           onPlayer={() => setMode('playing')}
         />
-      </Suspense>
+      </Suspense>}
 
       <header className="hud">
         <div className="brand">
           <span className="monogram">AF</span>
           <span>
             <strong>Aarav's Films</strong>
-            <small>AN INTERACTIVE FILM ROOM</small>
+            <small>A PERSONAL FILM JOURNAL</small>
           </span>
         </div>
         <nav>
@@ -1031,7 +384,7 @@ export default function FilmRoom() {
       {mode === 'room' && (
         <div className="room-caption">
           <span>THE ROOM • {films.length} FILMS</span>
-          <p>Choose a spine, open a drawer, or wake the TV.</p>
+          <p>A shelf of films. A box of memories. Pick a labeled tape to begin.</p>
         </div>
       )}
 
@@ -1103,9 +456,9 @@ export default function FilmRoom() {
               ) : mode === 'inserting' ? (
                 <p className="disc-status">Moving disc to the TV player...</p>
               ) : caseOpen ? (
-                <p className="disc-status">Click the spinning disc to begin.</p>
+                <button className="subtle" onClick={() => setMode('confirm')}>PLAY THIS MEMORY</button>
               ) : (
-                <p className="disc-status">Click the case to open it.</p>
+                <button className="subtle" onClick={() => setCaseOpen(true)}>OPEN CASE</button>
               )}
             </div>
           </section>
@@ -1120,7 +473,7 @@ export default function FilmRoom() {
                 <span className="eyebrow">{mode === 'catalog' ? 'THE CARD CATALOG' : 'THE TICKET BOX'}</span>
                 <h2>{mode === 'catalog' ? 'Find a film.' : 'Memories on paper.'}</h2>
               </div>
-              <button onClick={() => setMode('room')}>×</button>
+              <button aria-label="Return to room" onClick={() => setMode('room')}>×</button>
             </div>
             {mode === 'catalog' ? (
               <>

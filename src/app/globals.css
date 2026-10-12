@@ -863,3 +863,20 @@ nav button:hover,
     font-size: clamp(44px, 16vw, 72px);
   }
 }
+
+/* Keep the room primary. On small screens controls remain reachable without covering the collection. */
+@media (max-width: 600px) {
+  .hud { padding: 18px 16px; gap: 16px; flex-wrap: wrap; }
+  .hud nav { width: 100%; gap: 6px; }
+  .hud nav button { flex: 1; padding: 10px 5px; font-size: 9px; }
+  .room-caption { left: 18px; bottom: 24px; max-width: 290px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  button { transition: none !important; }
+}
+.case-ticket-side, .case-disc-side { min-width: 0; }
+.case-stage { width: 100%; max-width: 340px; }
+@media (max-width: 800px) {
+  .case-disc-side { padding: 18px; }
+  .case-stage { height: 280px; }
+}
