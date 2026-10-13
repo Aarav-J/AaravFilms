@@ -824,11 +824,12 @@ nav button:hover,
 .review {
   position: relative;
   z-index: 1;
-  width: min(820px, calc(100% - 42px));
+  width: min(920px, calc(100% - 42px));
   max-height: calc(min(610px, calc(100dvh - 136px)) - 88px);
   margin: 0 auto;
   overflow: auto;
-  padding: 56px 0 70px;
+  padding: 56px 64px 70px 0;
+  scrollbar-gutter: stable;
 }
 
 .review,

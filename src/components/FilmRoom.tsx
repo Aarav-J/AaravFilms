@@ -45,7 +45,11 @@ const compactTicketDate = new Intl.DateTimeFormat("en", {
 
 function reviewParagraphs(film: Film, viewing: Viewing) {
   const diaryReview = viewing.review?.trim();
-  if (diaryReview) return diaryReview.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  if (diaryReview)
+    return diaryReview
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter(Boolean);
   if (film.review.length > 0) return film.review;
   return ["No written review for this watch yet."];
 }
@@ -740,9 +744,7 @@ export default function FilmRoom() {
           >
             <div className="tv-glass">
               <div className="player-toolbar">
-                <span>
-                  ● DVD VIDEO <small>THE FILM ROOM</small>
-                </span>
+                <span>●</span>
                 <button
                   className="eject-btn"
                   onClick={() => {
@@ -834,7 +836,6 @@ export default function FilmRoom() {
                     <p key={index}>{paragraph}</p>
                   ))}
                   <div className="review-end">
-                    <span>THE END.</span>
                     <button onClick={() => setMode("playing")}>DVD MENU</button>
                   </div>
                 </article>
