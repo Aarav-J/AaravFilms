@@ -386,7 +386,16 @@ export default function FilmRoom() {
   const [genreFilter, setGenreFilter] = useState("all");
   const [ticketQuery, setTicketQuery] = useState("");
   const [ticketSort, setTicketSort] = useState<TicketSort>("newest");
+  const [showGuide, setShowGuide] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.localStorage.getItem("film-room-guide-dismissed") !== "1";
+  });
   const sfx = useSounds();
+
+  function closeGuide() {
+    setShowGuide(false);
+    window.localStorage.setItem("film-room-guide-dismissed", "1");
+  }
 
   const allTickets: TicketEntry[] = useMemo(
     () =>
@@ -510,6 +519,26 @@ export default function FilmRoom() {
         onTickets={() => setMode("tickets")}
       />
 
+      {mode === "room" && (
+        showGuide ? (
+          <aside className="room-guide" aria-label="How to explore the film room">
+            <div>
+              <strong>Explore the shelf</strong>
+              <p>Click a tape or poster to open a film. Drag to pan. Scroll or pinch to zoom.</p>
+            </div>
+            <button type="button" onClick={closeGuide}>Got it</button>
+          </aside>
+        ) : (
+          <button
+            type="button"
+            className="room-guide-tab"
+            onClick={() => setShowGuide(true)}
+            aria-label="Show room controls"
+          >
+            Controls
+          </button>
+        )
+      )}
       {(mode === "case" || mode === "confirm") && (
         <div
           className="case-shade"
