@@ -4,7 +4,8 @@ import { useFrame } from '@react-three/fiber';
 import { Html, RoundedBox, useGLTF } from '@react-three/drei';
 import { useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { films, type Film } from '@/data/films';
+import { type Film } from '@/data/films';
+import { useFilmPosterTexture } from './useFilmPosterTexture';
 
 // All dimensions are in room units. A bay holds 112 journal entries.
 export const SHELF_COLUMNS = 28;
@@ -14,7 +15,7 @@ const palette = ['#b1a58b', '#25252a', '#703b30', '#a3906a', '#3d5055', '#6c715e
 function random(seed: number) { const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
 function texture(w: number, h: number, paint: (ctx: CanvasRenderingContext2D) => void) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
-  paint(c.getContext('2d')!); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  paint(c.getContext('2d')!); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
 function woodTexture() {
   return texture(256, 1024, ctx => {
@@ -28,51 +29,59 @@ function woodTexture() {
   });
 }
 function spineTexture(film: Film | undefined, index: number) {
-  return texture(96, 512, ctx => {
+  // Rendered at 2x and downsampled by the GPU so titles stay crisp at a
+  // grazing shelf-viewing angle instead of smearing into illegible noise.
+  return texture(192, 1024, ctx => {
+    ctx.scale(2, 2);
     ctx.fillStyle = film?.color ?? palette[Math.floor(random(index + 90) * palette.length)]; ctx.fillRect(0, 0, 96, 512);
     ctx.fillStyle = '#d6c6a3'; ctx.fillRect(5, 12, 86, 44); ctx.fillRect(5, 451, 86, 49);
     if (!film && index % 5 === 0) { ctx.fillStyle = '#d4c7a8'; ctx.fillRect(8, 64, 80, 376); }
-    ctx.fillStyle = '#28241f'; ctx.textAlign = 'center'; ctx.font = 'bold 14px monospace';
-    ctx.fillText(film ? `AF ${film.spine}` : 'VHS', 48, 31); ctx.font = '10px monospace'; ctx.fillText('HI-FI STEREO', 48, 47);
+    ctx.fillStyle = '#28241f'; ctx.textAlign = 'center'; ctx.font = 'bold 15px monospace';
+    ctx.fillText(film ? `AF ${film.spine}` : 'VHS', 48, 32); ctx.font = 'bold 11px monospace'; ctx.fillText('HI-FI STEREO', 48, 47);
     ctx.save(); ctx.translate(48, 252); ctx.rotate(-Math.PI / 2);
-    ctx.fillStyle = film?.accent ?? (index % 5 === 0 ? '#382d23' : '#e5dcc6'); ctx.font = `bold ${film && film.title.length > 25 ? 18 : 24}px Georgia`;
-    ctx.fillText(film?.title.toUpperCase() ?? ['VIDEO ARCHIVE', 'BLANK TAPE', 'HOME VIDEO', 'STEREO / VHS'][index % 4], 0, 6, 355); ctx.restore();
-    ctx.font = 'bold 14px monospace'; ctx.fillStyle = '#30261e'; ctx.fillText(film ? String(film.year) : 'T-120', 48, 474);
+    const label = film?.title.toUpperCase() ?? ['VIDEO ARCHIVE', 'BLANK TAPE', 'HOME VIDEO', 'STEREO / VHS'][index % 4];
+    ctx.font = `800 ${film && film.title.length > 22 ? 27 : 33}px Arial, sans-serif`;
+    ctx.lineJoin = 'round'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(8,6,4,.6)';
+    ctx.strokeText(label, 0, 8, 370);
+    ctx.fillStyle = film?.accent ?? (index % 5 === 0 ? '#382d23' : '#e5dcc6'); ctx.fillText(label, 0, 8, 370);
+    ctx.restore();
+    ctx.font = 'bold 17px monospace'; ctx.fillStyle = '#30261e'; ctx.fillText(film ? String(film.year) : 'T-120', 48, 476);
     for (let n = 0; n < 22; n++) { ctx.fillStyle = '#1f1d1a'; ctx.fillRect(13 + n * 3, 481, random(n) > .5 ? 2 : 1, 12); }
     // Paper wear, fading, and rubbed edges, deterministic across reloads.
     for (let n = 0; n < 180; n++) { ctx.fillStyle = `rgba(235,213,178,${random(n + index) * .12})`; ctx.fillRect(random(n + 2) * 96, random(n + 7) * 512, 1 + random(n + 3) * 12, 1); }
     ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(0, 0, 3, 512); ctx.fillRect(93, 0, 3, 512);
   });
 }
-function coverTexture(film: Film) {
-  return texture(384, 540, ctx => {
-    const g = ctx.createLinearGradient(0, 0, 300, 540); g.addColorStop(0, film.color); g.addColorStop(1, '#0f141b'); ctx.fillStyle = g; ctx.fillRect(0, 0, 384, 540);
-    // Original graphic sleeves, not scraped poster art.
-    ctx.fillStyle = film.accent; ctx.globalAlpha = .55; ctx.beginPath(); ctx.arc(192, 238, 115, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1; ctx.fillStyle = '#10151a';
-    for (let i = 0; i < 7; i++) { const x = 40 + i * 46; ctx.fillRect(x, 265 - random(i + film.year) * 90, 34, 175); }
-    ctx.strokeStyle = film.accent; ctx.lineWidth = 2; ctx.strokeRect(12, 12, 360, 516);
-    ctx.textAlign = 'center'; ctx.fillStyle = '#ead8b5'; ctx.font = '12px monospace'; ctx.fillText('THE PERSONAL COLLECTION', 192, 38);
-    ctx.font = 'bold 32px Georgia'; const words = film.title.toUpperCase().split(' '); const lines: string[] = []; let line = '';
-    words.forEach(word => { if (ctx.measureText(`${line} ${word}`).width > 330) { lines.push(line); line = word; } else line = line ? `${line} ${word}` : word; }); lines.push(line);
-    lines.forEach((l, i) => ctx.fillText(l, 192, 74 + i * 36));
-    ctx.font = '15px Georgia'; ctx.fillText(film.director, 192, 467, 330); ctx.font = 'bold 13px monospace'; ctx.fillText(`${film.year}  /  VHS  /  ${film.spine}`, 192, 500);
-  });
-}
 function Box({ position, size, material }: { position: [number, number, number]; size: [number, number, number]; material: THREE.Material }) {
   return <mesh position={position} material={material} castShadow receiveShadow><boxGeometry args={size} /></mesh>;
 }
-function Tape({ film, index, position, onSelect, cover = false, stacked = false }: { film?: Film; index: number; position: [number, number, number]; onSelect: (film: Film) => void; cover?: boolean; stacked?: boolean }) {
-  const map = useMemo(() => cover && film ? coverTexture(film) : spineTexture(film, index), [film, index, cover]);
+function Tape({ film, index, position, onSelect, stacked = false }: { film?: Film; index: number; position: [number, number, number]; onSelect: (film: Film) => void; stacked?: boolean }) {
+  const map = useMemo(() => spineTexture(film, index), [film, index]);
   const [hover, setHover] = useState(false); const ref = useRef<THREE.Group>(null);
   useFrame((_, dt) => { if (ref.current) ref.current.position.z = THREE.MathUtils.damp(ref.current.position.z, position[2] + (hover ? .17 : 0), 10, dt); });
-  return <group ref={ref} position={position} rotation={[0, 0, stacked ? Math.PI / 2 : cover ? -.045 : (random(index) - .5) * .045]}
+  const disorderedLean = !stacked && random(index + (film ? 47 : 31)) > (film ? .72 : .58);
+  const zRotation = stacked ? Math.PI / 2 : (random(index) - .5) * (film ? (disorderedLean ? .11 : .045) : (disorderedLean ? .18 : .045));
+  const caseHeight = 1.12 + random(index) * (film ? .08 : .13);
+  return <group ref={ref} position={position} rotation={[0, 0, zRotation]}
     onClick={film ? e => { e.stopPropagation(); onSelect(film); } : undefined}
     onPointerOver={film ? e => { e.stopPropagation(); setHover(true); document.body.style.cursor = 'pointer'; } : undefined}
     onPointerOut={() => { setHover(false); document.body.style.cursor = 'grab'; }}>
-    <mesh castShadow receiveShadow><boxGeometry args={[cover ? .69 : .19, 1.12 + random(index) * .05, cover ? .14 : .66]} /><meshStandardMaterial color="#191817" roughness={.86} /></mesh>
-    <mesh position={[0, 0, cover ? .073 : .333]}><planeGeometry args={[cover ? .685 : .184, 1.115]} /><meshStandardMaterial map={map} roughness={.86} emissive={hover ? '#d0a467' : '#000000'} emissiveIntensity={.12} /></mesh>
+    <mesh castShadow receiveShadow><boxGeometry args={[.19, caseHeight, .66]} /><meshStandardMaterial color="#191817" roughness={.86} /></mesh>
+    <mesh position={[0, 0, .333]}><planeGeometry args={[.184, 1.115]} /><meshStandardMaterial map={map} roughness={.86} emissive={hover ? '#d0a467' : '#000000'} emissiveIntensity={.12} /></mesh>
     {hover && film && <Html position={[0, .8, .4]} center><div className="hover-label">{film.title}<small>Open journal entry</small></div></Html>}
+  </group>;
+}
+function CoverTape({ film, index, position, onSelect }: { film: Film; index: number; position: [number, number, number]; onSelect: (film: Film) => void }) {
+  const map = useFilmPosterTexture(film);
+  const [hover, setHover] = useState(false); const ref = useRef<THREE.Group>(null);
+  useFrame((_, dt) => { if (ref.current) ref.current.position.z = THREE.MathUtils.damp(ref.current.position.z, position[2] + (hover ? .17 : 0), 10, dt); });
+  return <group ref={ref} position={position} rotation={[0, 0, -.045]}
+    onClick={e => { e.stopPropagation(); onSelect(film); }}
+    onPointerOver={e => { e.stopPropagation(); setHover(true); document.body.style.cursor = 'pointer'; }}
+    onPointerOut={() => { setHover(false); document.body.style.cursor = 'grab'; }}>
+    <mesh castShadow receiveShadow><boxGeometry args={[.69, 1.12 + random(index) * .05, .14]} /><meshStandardMaterial color="#191817" roughness={.86} /></mesh>
+    <mesh position={[0, 0, .073]}><planeGeometry args={[.685, 1.115]} /><meshStandardMaterial map={map} roughness={.58} emissive={hover ? '#d0a467' : '#000000'} emissiveIntensity={.1} /></mesh>
+    {hover && <Html position={[0, .8, .4]} center><div className="hover-label">{film.title}<small>Open journal entry</small></div></Html>}
   </group>;
 }
 function ShelfBay({ entries, bay, onSelect }: { entries: Film[]; bay: number; onSelect: (film: Film) => void }) {
@@ -84,17 +93,14 @@ function ShelfBay({ entries, bay, onSelect }: { entries: Film[]; bay: number; on
     {[0, 1.43, 2.86, 4.29, 5.72].map(y => <group key={y}><Box position={[0, y + .09, 0]} size={[7.2, .18, 1.02]} material={wood} /><Box position={[0, y + .09, .51]} size={[7.2, .12, .05]} material={wood} /></group>)}
     {Array.from({ length: BAY_CAPACITY }, (_, i) => {
       const row = Math.floor(i / SHELF_COLUMNS); const col = i % SHELF_COLUMNS; const film = entries[i];
-      // Blank archival sleeves are set dressing, never duplicate/fake journal entries.
-      if (!film && row === 3 && col > 15 && col < 25 && bay === 0) return null;
-      if (!film && row === 1 && col >= 13 && col < 18) return null;
-      if (!film && row === 2 && col >= 5 && col < 10) return null;
-      return <Tape key={film?.id ?? `sleeve-${i}`} film={film} index={i + bay * 112} position={[-3.26 + col * .24, 5.07 - row * 1.43, .06 + random(i) * .035]} onSelect={onSelect} />;
+      if (!film) return null;
+      const caseShuffle = random(i + bay * 19) > .76;
+      const shuffleX = caseShuffle ? (random(i + 41) - .5) * .045 : 0;
+      const shuffleY = caseShuffle ? (random(i + 43) - .5) * .055 : 0;
+      const shuffleZ = random(i) * (caseShuffle ? .06 : .035);
+      return <Tape key={film.id} film={film} index={i + bay * BAY_CAPACITY} position={[-3.26 + col * .24 + shuffleX, 5.07 - row * 1.43 + shuffleY, .06 + shuffleZ]} onSelect={onSelect} />;
     })}
-    {[1, 2].map(row => Array.from({ length: 6 }, (_, i) => {
-      const slot = row * SHELF_COLUMNS + (row === 1 ? 13 : 5) + Math.min(i, 4);
-      return !entries[slot] ? <Tape key={`stack-${row}-${i}`} index={slot + i} position={[row === 1 ? .37 : -1.55, 5.07 - row * 1.43 - .48 + i * .2, .1]} onSelect={onSelect} stacked /> : null;
-    }))}
-    {[entries[2], entries[6], entries[10]].map((film, i) => film && <Tape key={`cover-${film.id}`} film={film} index={i} cover position={[-2.25 + i * 2.15, 3.65 - (i % 2) * 1.43, .69]} onSelect={onSelect} />)}
+    {[entries[2], entries[6], entries[10]].map((film, i) => film && <CoverTape key={`cover-${film.id}`} film={film} index={i} position={[-2.25 + i * 2.15, 3.65 - (i % 2) * 1.43, .69]} onSelect={onSelect} />)}
   </group>;
 }
 function NormalizedModel({ path, position, width, rotation = 0 }: { path: string; position: [number, number, number]; width: number; rotation?: number }) {
@@ -178,20 +184,31 @@ function Gremlin() {
     </group>)}
   </group>;
 }
-export default function ReferenceRoom({ onSelect, active, onPlayer }: { onSelect: (film: Film) => void; active: boolean; onPlayer: () => void }) {
+function WallPoster({ film, position }: { film: Film; position: [number, number, number] }) {
+  const map = useFilmPosterTexture(film);
+  const w = 1.02, h = 1.53;
+  return <group position={position}>
+    <mesh position={[0, 0, -.045]} castShadow receiveShadow><boxGeometry args={[w + .1, h + .1, .05]} /><meshStandardMaterial color="#1a1410" roughness={.85} /></mesh>
+    <mesh position={[0, 0, -.015]}><boxGeometry args={[w + .03, h + .03, .01]} /><meshStandardMaterial color="#cbb78a" metalness={.3} roughness={.5} /></mesh>
+    <mesh castShadow><planeGeometry args={[w, h]} /><meshStandardMaterial map={map} roughness={.5} side={THREE.DoubleSide} /></mesh>
+  </group>;
+}
+export default function ReferenceRoom({ films, onSelect, active, onPlayer }: { films: Film[]; onSelect: (film: Film) => void; active: boolean; onPlayer: () => void }) {
   const wood = useMemo(() => new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: .85 }), []);
   const wall = useMemo(() => new THREE.MeshStandardMaterial({ color: '#645044', roughness: 1 }), []);
   const black = useMemo(() => new THREE.MeshStandardMaterial({ color: '#393934', roughness: .65 }), []);
   const bays = Math.max(1, Math.ceil(films.length / BAY_CAPACITY));
-  const posters = useMemo(() => [films[0], films[7], films[9]].filter(Boolean).map(film => ({ film, map: coverTexture(film) })), []);
+  const wallFilms = useMemo(() => {
+    const avgRating = (film: Film) => film.viewings.length === 0 ? 0 : film.viewings.reduce((sum, v) => sum + v.rating, 0) / film.viewings.length;
+    return [...films].sort((a, b) => (a.favoriteRank ?? 999) - (b.favoriteRank ?? 999) || avgRating(b) - avgRating(a)).slice(0, 4);
+  }, [films]);
   return <group>
     <Box position={[0, 4, -1.05]} size={[40, 10, .18]} material={wall} />
     <Box position={[-5.7 - (bays - 1) * 7.25, 4, 3]} size={[.18, 10, 8]} material={wall} />
     {Array.from({ length: 27 + (bays - 1) * 11 }, (_, i) => <Box key={i} position={[-8 - (bays - 1) * 7.7 + i * .7, -.07, 3]} size={[.684, .1, 18]} material={wood} />)}
     {Array.from({ length: bays }, (_, bay) => <ShelfBay key={bay} entries={films.slice(bay * BAY_CAPACITY, (bay + 1) * BAY_CAPACITY)} bay={bay} onSelect={onSelect} />)}
-    {posters.map(({ film, map }, i) => <mesh key={film.id} position={[2.58 + i * 1.55, 5.06 + (i % 2) * .18, -.925]}><planeGeometry args={[1.35, 1.9]} /><meshStandardMaterial map={map} roughness={1} /></mesh>)}
+    {wallFilms.map((film, i) => <WallPoster key={film.id} film={film} position={[3.8 + i * 1.35, 5.3 + (i % 2) * .15, -.85]} />)}
     <Television active={active} onClick={onPlayer} /><ReelLamp /><Plush /><Rug /><Cables />
-    <NormalizedModel path="/models/delorean.glb" width={1.25} position={[-2.1, 5.92, .03]} rotation={-.25} />
     <NormalizedModel path="/models/delorean.glb" width={1.07} position={[2.53, 2.1, 1]} rotation={-.2} />
     <Gremlin />
     <NormalizedModel path="/models/popcorn-box.glb" width={.5} position={[.7, 2.96, .16]} />
