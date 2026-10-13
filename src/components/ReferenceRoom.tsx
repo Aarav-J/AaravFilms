@@ -299,6 +299,15 @@ function ShelfBay({
     () => new THREE.MeshStandardMaterial({ color: "#302319", roughness: 1 }),
     [],
   );
+  const entriesKey = entries.map((film) => film.id).join("|");
+  const faceFrontFilms = useMemo(() => {
+    const pool = entries.filter(Boolean);
+    for (let i = pool.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return pool.slice(0, 3);
+  }, [entriesKey]);
   return (
     <group position={[-1.65 - bay * 7.25, 0, 0]}>
       <Box position={[0, 2.9, -0.39]} size={[7.08, 5.8, 0.1]} material={dark} />
@@ -347,18 +356,15 @@ function ShelfBay({
           />
         );
       })}
-      {[entries[2], entries[6], entries[10]].map(
-        (film, i) =>
-          film && (
-            <CoverTape
-              key={`cover-${film.id}`}
-              film={film}
-              index={i}
-              position={[-2.25 + i * 2.15, 3.65 - (i % 2) * 1.43, 0.69]}
-              onSelect={onSelect}
-            />
-          ),
-      )}
+      {faceFrontFilms.map((film, i) => (
+        <CoverTape
+          key={`cover-${film.id}`}
+          film={film}
+          index={i}
+          position={[-2.25 + i * 2.15, 3.65 - (i % 2) * 1.43, 0.69]}
+          onSelect={onSelect}
+        />
+      ))}
     </group>
   );
 }
