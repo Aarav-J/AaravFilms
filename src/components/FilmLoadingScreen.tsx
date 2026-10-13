@@ -69,6 +69,50 @@ function Reel() {
   );
 }
 
+export function FilmLoadingShell({
+  phase = "loading",
+  caption = "Loading your film journal",
+  hint = "Posters, room models and recent watches.",
+  backgroundUrl = "/room-background.webp",
+}: {
+  phase?: "loading" | "done" | "error";
+  caption?: string;
+  hint?: string;
+  backgroundUrl?: string | null;
+}) {
+  return (
+    <main className={styles.root} data-phase={phase}>
+      {backgroundUrl && (
+        <img className={styles.background} src={backgroundUrl} alt="" />
+      )}
+      <div className={styles.shade} />
+      <section className={styles.content} aria-label="Film journal loading">
+        <div className={styles.reel}>
+          <Reel />
+        </div>
+        <h1 className={styles.title}>Aarav&apos;s Films</h1>
+        <p className={styles.tagline}>
+          Larp representation of the movies I've watched
+        </p>
+        <div className={styles.status} role="status" aria-live="polite">
+          <p className={styles.caption}>{caption}</p>
+          <div
+            className={styles.bar}
+            role="progressbar"
+            aria-label="Loading journal"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuetext="Waiting for the film room"
+          >
+            <span className={styles.fill} />
+          </div>
+          <p className={styles.hint}>{hint}</p>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 export default function FilmLoadingScreen<F = unknown>({
   onReady,
   onSkip,

@@ -8,7 +8,7 @@ import { films as seedFilms, type Film, type Viewing } from "@/data/films";
 import ReferenceRoom, { BAY_CAPACITY } from "./ReferenceRoom";
 import { useFilmPosterTexture } from "./useFilmPosterTexture";
 import { useSounds } from "./useSounds";
-import FilmLoadingScreen from "./FilmLoadingScreen";
+import FilmLoadingScreen, { FilmLoadingShell } from "./FilmLoadingScreen";
 import { type FilmsPayload } from "./useFilmsLoader";
 
 type Mode =
@@ -501,7 +501,7 @@ export default function FilmRoom() {
 
   return (
     <main className="cinema">
-      <Suspense fallback={null}>
+      <Suspense fallback={<FilmLoadingShell hint="Posters and room assets." />}>
         <Scene
           films={catalogFilms}
           mode={mode}
