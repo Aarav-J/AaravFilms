@@ -192,15 +192,12 @@ function csvRows(text: string): CsvRow[] {
   return records.map((record) => Object.fromEntries(headers.map((header, index) => [header, record[index] ?? ''])));
 }
 
-// Map each export filename to an env var that can hold its base64-encoded
-// content. Set these on Vercel (or any host) when the export directory is not
-// present in the deployment. Local dev continues to use the filesystem.
+// On Vercel (or any host where letterboxd_export/ is absent), set
+// LETTERBOXD_DIARY_CSV to the base64-encoded content of diary.csv.
+// The other files are read from the filesystem in local dev only;
+// their features (favorites, extended reviews) degrade gracefully without them.
 const EXPORT_ENV_VARS: Record<string, string> = {
-  'diary.csv':   'LETTERBOXD_DIARY_CSV',
-  'ratings.csv': 'LETTERBOXD_RATINGS_CSV',
-  'reviews.csv': 'LETTERBOXD_REVIEWS_CSV',
-  'watched.csv': 'LETTERBOXD_WATCHED_CSV',
-  'profile.csv': 'LETTERBOXD_PROFILE_CSV',
+  'diary.csv': 'LETTERBOXD_DIARY_CSV',
 };
 
 async function readExportText(filename: string) {
