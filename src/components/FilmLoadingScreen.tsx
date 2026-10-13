@@ -91,9 +91,7 @@ export function FilmLoadingShell({
           <Reel />
         </div>
         <h1 className={styles.title}>Aarav&apos;s Films</h1>
-        <p className={styles.tagline}>
-          Larp representation of the movies I've watched
-        </p>
+        <p className={styles.tagline}>LARP</p>
         <div className={styles.status} role="status" aria-live="polite">
           <p className={styles.caption}>{caption}</p>
           <div
@@ -170,9 +168,7 @@ export default function FilmLoadingScreen<F = unknown>({
           <Reel />
         </div>
         <h1 className={styles.title}>Aarav&apos;s Films</h1>
-        <p className={styles.tagline}>
-          Larp representation of the movies I've watched
-        </p>
+        <p className={styles.tagline}>LARP</p>
         <div className={styles.status} role="status" aria-live="polite">
           <p className={styles.caption}>{caption}</p>
           <div
