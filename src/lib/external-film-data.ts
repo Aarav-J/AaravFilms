@@ -146,6 +146,11 @@ function numericRating(value: string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function isIgnoredFilmTitle(title: string) {
+  return title.trim().toLowerCase() === 'favorites';
+}
+
+
 function parseLetterboxdRssEntries(xml: string): LetterboxdEntry[] {
   return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(([, item]) => ({
     title: tagValue(item, 'letterboxd:filmTitle') ?? tagValue(item, 'title') ?? 'Untitled',
@@ -153,7 +158,7 @@ function parseLetterboxdRssEntries(xml: string): LetterboxdEntry[] {
     link: tagValue(item, 'link') ?? '',
     rating: numericRating(tagValue(item, 'letterboxd:memberRating')),
     review: htmlToText(tagValue(item, 'description'))
-  })).filter((entry) => entry.link.length > 0);
+  })).filter((entry) => entry.link.length > 0 && !isIgnoredFilmTitle(entry.title));
 }
 
 async function fetchLetterboxdEntries(username: string): Promise<LetterboxdEntry[]> {
@@ -384,6 +389,7 @@ async function buildExportFilms(): Promise<ExportBuild | null> {
 
   for (const row of diaryRows) {
     const title = row.Name || 'Untitled';
+    if (isIgnoredFilmTitle(title)) continue;
     const year = Number(row.Year) || 0;
     const link = row['Letterboxd URI'] || '';
     const key = link || `${title.toLowerCase()}-${year}`;
