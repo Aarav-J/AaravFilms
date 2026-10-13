@@ -377,8 +377,6 @@ async function buildExportFilms(): Promise<ExportBuild | null> {
 
   const reviewRows = await readExportCsv('reviews.csv');
   const reviewByUri = Object.fromEntries(reviewRows.map((row) => [row['Letterboxd URI'] ?? '', row.Review ?? '']).filter(([uri, review]) => uri && review));
-  const ratingRows = await readExportCsv('ratings.csv');
-  const ratingByTitleYear = Object.fromEntries(ratingRows.map((row) => [`${(row.Name || '').toLowerCase()}-${Number(row.Year) || 0}`, numericRating(row.Rating)]).filter(([key, rating]) => key !== '-0' && rating !== null));
   const favoriteRows = await readFavoriteExportEntries();
   const favoriteByTitleYear = Object.fromEntries(favoriteRows.map((favorite) => [`${favorite.title.toLowerCase()}-${favorite.year}`, favorite]));
   const seedByTitleYear = Object.fromEntries(seedFilms.map((film) => [`${film.title.toLowerCase()}-${film.year}`, film]));
@@ -393,23 +391,6 @@ async function buildExportFilms(): Promise<ExportBuild | null> {
     grouped[key].entries.push(exportEntry(row, reviewByUri));
   }
 
-  for (const favorite of favoriteRows.filter((entry) => entry.rank <= 4)) {
-    const titleYear = `${favorite.title.toLowerCase()}-${favorite.year}`;
-    const exists = Object.values(grouped).some((group) => `${group.title.toLowerCase()}-${group.year}` === titleYear);
-    if (exists) continue;
-    grouped[`favorite-${favorite.rank}-${titleYear}`] = {
-      title: favorite.title,
-      year: favorite.year,
-      link: favorite.link,
-      entries: [{
-        title: favorite.title,
-        watchedDate: favorite.listDate,
-        link: favorite.link,
-        rating: ratingByTitleYear[titleYear] ?? null,
-        review: null
-      }]
-    };
-  }
 
   const entriesById: Record<string, LetterboxdEntry[]> = {};
   const filmsRaw = Object.values(grouped).map((group, index) => {
