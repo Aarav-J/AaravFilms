@@ -43,6 +43,11 @@ const compactTicketDate = new Intl.DateTimeFormat("en", {
   year: "numeric",
 });
 
+function formatViewingDate(value: string) {
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? compactTicketDate.format(new Date(time)) : value;
+}
+
 function reviewParagraphs(film: Film, viewing: Viewing) {
   const diaryReview = viewing.review?.trim();
   if (diaryReview)
@@ -738,9 +743,7 @@ export default function FilmRoom() {
                         <strong>
                           {film.title}
                           <small>
-                            {compactTicketDate.format(
-                              new Date(ticketViewing.date),
-                            )}{" "}
+                            {formatViewingDate(ticketViewing.date)}{" "}
                             • {ticketViewing.with} • {ticketViewing.where}
                           </small>
                           <em>
@@ -796,9 +799,7 @@ export default function FilmRoom() {
                         <h1>{selected.title}</h1>
                         <div className="dvd-meta">
                           <span>{viewing.rating} / 5</span>
-                          <span>
-                            {compactTicketDate.format(new Date(viewing.date))}
-                          </span>
+                          <span>{formatViewingDate(viewing.date)}</span>
                         </div>
                         <div className="source-links">
                           <a
@@ -835,7 +836,7 @@ export default function FilmRoom() {
                               onClick={() => setWatch(index)}
                             >
                               <span className="stub-date">
-                                {compactTicketDate.format(new Date(v.date))}
+                                {formatViewingDate(v.date)}
                               </span>
                               <span className="stub-rating">
                                 {v.rating} / 5
