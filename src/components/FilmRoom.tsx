@@ -8,6 +8,8 @@ import { films as seedFilms, type Film, type Viewing } from "@/data/films";
 import ReferenceRoom, { BAY_CAPACITY } from "./ReferenceRoom";
 import { useFilmPosterTexture } from "./useFilmPosterTexture";
 import { useSounds } from "./useSounds";
+import FilmLoadingScreen from "./FilmLoadingScreen";
+import { type FilmsPayload } from "./useFilmsLoader";
 
 type Mode =
   | "room"
@@ -22,7 +24,6 @@ type Mode =
 type TicketEntry = { film: Film; viewing: Viewing; index: number };
 type CatalogSort = "shelf" | "title" | "year" | "rating" | "recent";
 type TicketSort = "newest" | "oldest" | "rating" | "title";
-type FilmsApiResponse = { films: Film[] };
 
 function averageRating(film: Film) {
   if (film.viewings.length === 0) return 0;
@@ -352,6 +353,7 @@ function Scene({
 }
 
 export default function FilmRoom() {
+  const [ready, setReady] = useState(false);
   const [mode, setMode] = useState<Mode>("room");
   const [catalogFilms, setCatalogFilms] = useState<Film[]>(seedFilms);
   const [selected, setSelected] = useState<Film>(seedFilms[0]);
@@ -441,26 +443,12 @@ export default function FilmRoom() {
     });
   }
 
-  useEffect(() => {
-    let active = true;
-    fetch("/api/films")
-      .then((response) =>
-        response.ok ? (response.json() as Promise<FilmsApiResponse>) : null,
-      )
-      .then((payload) => {
-        if (!active || !payload?.films?.length) return;
-        setCatalogFilms(payload.films);
-        setSelected(
-          (current) =>
-            payload.films.find((film) => film.id === current.id) ??
-            payload.films[0],
-        );
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, []);
+  function handleReady(payload: FilmsPayload<Film>) {
+    setCatalogFilms(payload.films);
+    setSelected(payload.films[0]);
+    setReady(true);
+  }
+
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -476,6 +464,15 @@ export default function FilmRoom() {
     const flip = window.setTimeout(() => setMode("playing"), 900);
     return () => { window.clearTimeout(crt); window.clearTimeout(flip); };
   }, [mode]);
+
+  if (!ready) {
+    return (
+      <FilmLoadingScreen<Film>
+        onReady={handleReady}
+        onSkip={() => setReady(true)}
+      />
+    );
+  }
 
   return (
     <main className="cinema">
