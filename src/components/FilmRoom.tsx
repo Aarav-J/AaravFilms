@@ -583,10 +583,10 @@ export default function FilmRoom() {
             <div className="drawer-top">
               <div>
                 <span className="eyebrow">
-                  {mode === "catalog" ? "THE CARD CATALOG" : "THE TICKET BOX"}
+                  {mode === "catalog" ? "THE CARD CATALOG" : "TICKETS"}
                 </span>
                 <h2>
-                  {mode === "catalog" ? "Find a film." : "Memories on paper."}
+                  {mode === "catalog" ? "Find a film" : "Viewing history"}
                 </h2>
               </div>
               <button

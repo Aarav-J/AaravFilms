@@ -277,6 +277,17 @@ function CoverTape({
     </group>
   );
 }
+function shelfEntryIndex(slot: number, bay: number) {
+  const row = Math.floor(slot / SHELF_COLUMNS);
+  const col = slot % SHELF_COLUMNS;
+  if (bay % 2 === 0) {
+    // TV-side bay: oldest starts at bottom-left, then fills upward.
+    return (SHELF_ROWS - 1 - row) * SHELF_COLUMNS + col;
+  }
+  // Next bay flips orientation: oldest starts at top-right, then fills downward.
+  return row * SHELF_COLUMNS + (SHELF_COLUMNS - 1 - col);
+}
+
 function ShelfBay({
   entries,
   bay,
@@ -336,17 +347,18 @@ function ShelfBay({
       {Array.from({ length: BAY_CAPACITY }, (_, i) => {
         const row = Math.floor(i / SHELF_COLUMNS);
         const col = i % SHELF_COLUMNS;
-        const film = entries[i];
+        const entryIndex = shelfEntryIndex(i, bay);
+        const film = entries[entryIndex];
         if (!film) return null;
-        const caseShuffle = random(i + bay * 19) > 0.76;
-        const shuffleX = caseShuffle ? (random(i + 41) - 0.5) * 0.045 : 0;
-        const shuffleY = caseShuffle ? (random(i + 43) - 0.5) * 0.055 : 0;
-        const shuffleZ = random(i) * (caseShuffle ? 0.06 : 0.035);
+        const caseShuffle = random(entryIndex + bay * 19) > 0.76;
+        const shuffleX = caseShuffle ? (random(entryIndex + 41) - 0.5) * 0.045 : 0;
+        const shuffleY = caseShuffle ? (random(entryIndex + 43) - 0.5) * 0.055 : 0;
+        const shuffleZ = random(entryIndex) * (caseShuffle ? 0.06 : 0.035);
         return (
           <Tape
             key={film.id}
             film={film}
-            index={i + bay * BAY_CAPACITY}
+            index={entryIndex + bay * BAY_CAPACITY}
             position={[
               -3.26 + col * 0.24 + shuffleX,
               5.07 - row * 1.43 + shuffleY,
