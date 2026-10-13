@@ -43,6 +43,13 @@ const compactTicketDate = new Intl.DateTimeFormat("en", {
   year: "numeric",
 });
 
+function reviewParagraphs(film: Film, viewing: Viewing) {
+  const diaryReview = viewing.review?.trim();
+  if (diaryReview) return diaryReview.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  if (film.review.length > 0) return film.review;
+  return ["No written review for this watch yet."];
+}
+
 function DiscMesh({
   poster,
   inserting,
@@ -438,6 +445,7 @@ export default function FilmRoom() {
       });
   }, [allTickets, ticketQuery, ticketSort]);
   const viewing = selected.viewings[watch];
+  const activeReviewParagraphs = reviewParagraphs(selected, viewing);
 
   function select(film: Film, index = 0) {
     sfx.tapePull();
@@ -791,7 +799,7 @@ export default function FilmRoom() {
                           </a>
                         </div>
                         <button onClick={() => setMode("review")}>
-                          READ MY REVIEW
+                          VIEW REVIEW
                         </button>
                       </div>
                       {selected.viewings.length > 1 && (
@@ -812,11 +820,6 @@ export default function FilmRoom() {
                           ))}
                         </div>
                       )}
-                      {viewing.review && (
-                        <blockquote className="viewing-review">
-                          “{viewing.review}”
-                        </blockquote>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -827,7 +830,7 @@ export default function FilmRoom() {
                   <p className="byline">
                     {selected.director} • {selected.year}
                   </p>
-                  {selected.review.map((paragraph, index) => (
+                  {activeReviewParagraphs.map((paragraph, index) => (
                     <p key={index}>{paragraph}</p>
                   ))}
                   <div className="review-end">
