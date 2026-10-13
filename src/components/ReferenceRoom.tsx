@@ -6,6 +6,8 @@ import { useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { type Film } from '@/data/films';
 import { useFilmPosterTexture } from './useFilmPosterTexture';
+import JournalFurniture from './JournalFurniture';
+import ChessTable from './ChessTable';
 
 // All dimensions are in room units. A bay holds 112 journal entries.
 export const SHELF_COLUMNS = 28;
@@ -193,7 +195,7 @@ function WallPoster({ film, position }: { film: Film; position: [number, number,
     <mesh castShadow><planeGeometry args={[w, h]} /><meshStandardMaterial map={map} roughness={.5} side={THREE.DoubleSide} /></mesh>
   </group>;
 }
-export default function ReferenceRoom({ films, onSelect, active, onPlayer }: { films: Film[]; onSelect: (film: Film) => void; active: boolean; onPlayer: () => void }) {
+export default function ReferenceRoom({ films, onSelect, active, onPlayer, onCatalog, onTickets }: { films: Film[]; onSelect: (film: Film) => void; active: boolean; onPlayer: () => void; onCatalog: () => void; onTickets: () => void }) {
   const wood = useMemo(() => new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: .85 }), []);
   const wall = useMemo(() => new THREE.MeshStandardMaterial({ color: '#645044', roughness: 1 }), []);
   const black = useMemo(() => new THREE.MeshStandardMaterial({ color: '#393934', roughness: .65 }), []);
@@ -208,6 +210,8 @@ export default function ReferenceRoom({ films, onSelect, active, onPlayer }: { f
     {Array.from({ length: 27 + (bays - 1) * 11 }, (_, i) => <Box key={i} position={[-8 - (bays - 1) * 7.7 + i * .7, -.07, 3]} size={[.684, .1, 18]} material={wood} />)}
     {Array.from({ length: bays }, (_, bay) => <ShelfBay key={bay} entries={films.slice(bay * BAY_CAPACITY, (bay + 1) * BAY_CAPACITY)} bay={bay} onSelect={onSelect} />)}
     {wallFilms.map((film, i) => <WallPoster key={film.id} film={film} position={[3.8 + i * 1.35, 5.3 + (i % 2) * .15, -.85]} />)}
+    <JournalFurniture bays={bays} filmCount={films.length} ticketCount={films.reduce((n, film) => n + film.viewings.length, 0)} onCatalog={onCatalog} onTickets={onTickets} />
+    <ChessTable />
     <Television active={active} onClick={onPlayer} /><ReelLamp /><Plush /><Rug /><Cables />
     <NormalizedModel path="/models/delorean.glb" width={1.07} position={[2.53, 2.1, 1]} rotation={-.2} />
     <Gremlin />

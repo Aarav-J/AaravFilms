@@ -199,7 +199,7 @@ function CameraRig({
           2.4 + Math.sin(angle) * 8.5,
           3.6 + pointer.y * 0.05,
           // cos term gives a circular orbital arc: z pulls in as you pan left/right
-          (baseZ * 0.38 + baseZ * 0.62 * Math.cos(angle * 0.72)),
+          baseZ * 0.38 + baseZ * 0.62 * Math.cos(angle * 0.72),
         );
     // Look target tracks drag so panning left actually reveals the left bookcase edge.
     const look = close
@@ -213,8 +213,9 @@ function CameraRig({
     target.lerp(look, 1 - Math.exp(-dt * 3));
     camera.lookAt(target);
     // Update HUD imperatively — no re-render cost.
-    const hud = document.getElementById('camera-hud');
-    if (hud) hud.textContent = `zoom ${zoom.current.toFixed(2)}  ·  pan ${dragAngle.current.toFixed(2)}`;
+    const hud = document.getElementById("camera-hud");
+    if (hud)
+      hud.textContent = `zoom ${zoom.current.toFixed(2)}  ·  pan ${dragAngle.current.toFixed(2)}`;
   });
   return null;
 }
@@ -293,11 +294,15 @@ function Scene({
   mode,
   onSelect,
   onPlayer,
+  onCatalog,
+  onTickets,
 }: {
   films: Film[];
   mode: Mode;
   onSelect: (film: Film) => void;
   onPlayer: () => void;
+  onCatalog: () => void;
+  onTickets: () => void;
 }) {
   const dragAngle = useRef(0);
   const zoom = useRef(1);
@@ -332,6 +337,9 @@ function Scene({
         color="#d6ab76"
         distance={12}
       />
+      {/* Left-side fill lights so the far bookshelf and journal furniture stay readable */}
+      <pointLight position={[-8, 4.2, 1.5]} intensity={22} color="#d4a97a" distance={14} decay={2} />
+      <pointLight position={[-4, 3.6, 3.8]} intensity={12} color="#c9b48a" distance={10} decay={2} />
       <CameraRig mode={mode} dragAngle={dragAngle} zoom={zoom} films={films} />
       <DragLook dragAngle={dragAngle} zoom={zoom} />
       <ReferenceRoom
@@ -339,6 +347,8 @@ function Scene({
         onSelect={onSelect}
         active={mode === "inserting" || mode === "playing" || mode === "review"}
         onPlayer={onPlayer}
+        onCatalog={onCatalog}
+        onTickets={onTickets}
       />
     </Canvas>
   );
@@ -479,6 +489,8 @@ export default function FilmRoom() {
             mode={mode}
             onSelect={select}
             onPlayer={() => setMode("playing")}
+            onCatalog={() => setMode("catalog")}
+            onTickets={() => setMode("tickets")}
           />
         </Suspense>
       )}
@@ -501,9 +513,7 @@ export default function FilmRoom() {
       {mode === "room" && (
         <div className="room-caption">
           <span>THE ROOM • {catalogFilms.length} FILMS</span>
-          <p>
-            A shelf of films. A box of memories. Pick a labeled tape to begin.
-          </p>
+          <p>A shelf of films. A box of memories. Pick a labeled tape, or open the card catalog and ticket box on the left.</p>
         </div>
       )}
       {mode === "room" && (

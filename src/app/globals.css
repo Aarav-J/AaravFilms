@@ -1098,6 +1098,31 @@ nav button:hover,
   .hud nav button { flex: 1; padding: 10px 5px; font-size: 9px; }
   .room-caption { left: 18px; bottom: 24px; max-width: 290px; }
 }
+/* Keyboard/touch affordances attached to the actual journal furniture. */
+.room-object-action {
+  min-width: 118px;
+  min-height: 44px;
+  padding: 7px 12px;
+  border: 1px solid #a68a5b;
+  border-radius: 3px;
+  color: #f1dfb9;
+  background: rgb(46 30 20 / .9);
+  box-shadow: 0 3px 12px rgb(0 0 0 / .3);
+  font: 600 13px Georgia, serif;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+.room-object-action span {
+  display: block;
+  margin-top: 3px;
+  color: #cbb48c;
+  font: 10px monospace;
+}
+.room-object-action:hover, .room-object-action.is-hovered {
+  background: #6e4b2c;
+  border-color: #e9c383;
+}
+
 @media (prefers-reduced-motion: reduce) {
   button { transition: none !important; }
 }
