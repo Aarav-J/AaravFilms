@@ -2,7 +2,7 @@
 
 import { useFrame } from "@react-three/fiber";
 import { Html, RoundedBox, useGLTF } from "@react-three/drei";
-import { useMemo, useRef, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { type Film } from "@/data/films";
 import { useFilmPosterTexture } from "./useFilmPosterTexture";
@@ -990,18 +990,19 @@ export default function ReferenceRoom({
       <Plush />
       <Rug />
       <Cables />
-      <NormalizedModel
-        path="/models/delorean.glb"
-        width={1.07}
-        position={[2.53, 2.1, 1]}
-        rotation={-0.2}
-      />
-      <Gremlin />
-      <NormalizedModel
-        path="/models/popcorn-box.glb"
-        width={0.5}
-        position={[0.7, 2.96, 0.16]}
-      />
+      <Suspense fallback={null}>
+        <NormalizedModel
+          path="/models/delorean.glb"
+          width={1.07}
+          position={[2.53, 2.1, 1]}
+          rotation={-0.2}
+        />
+        <NormalizedModel
+          path="/models/popcorn-box.glb"
+          width={0.5}
+          position={[0.7, 2.96, 0.16]}
+        />
+      </Suspense>
       <Box
         position={[0.85, 0.42, 0.23]}
         size={[1.65, 0.36, 0.75]}

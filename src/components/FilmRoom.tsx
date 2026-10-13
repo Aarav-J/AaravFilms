@@ -2,13 +2,13 @@
 import Image from "next/image";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { films as seedFilms, type Film, type Viewing } from "@/data/films";
 import ReferenceRoom, { BAY_CAPACITY } from "./ReferenceRoom";
 import { useFilmPosterTexture } from "./useFilmPosterTexture";
 import { useSounds } from "./useSounds";
-import FilmLoadingScreen, { FilmLoadingShell } from "./FilmLoadingScreen";
+import FilmLoadingScreen from "./FilmLoadingScreen";
 import { type FilmsPayload } from "./useFilmsLoader";
 
 type Mode =
@@ -501,16 +501,14 @@ export default function FilmRoom() {
 
   return (
     <main className="cinema">
-      <Suspense fallback={<FilmLoadingShell hint="Posters and room assets." />}>
-        <Scene
-          films={catalogFilms}
-          mode={mode}
-          onSelect={select}
-          onPlayer={() => setMode("playing")}
-          onCatalog={() => setMode("catalog")}
-          onTickets={() => setMode("tickets")}
-        />
-      </Suspense>
+      <Scene
+        films={catalogFilms}
+        mode={mode}
+        onSelect={select}
+        onPlayer={() => setMode("playing")}
+        onCatalog={() => setMode("catalog")}
+        onTickets={() => setMode("tickets")}
+      />
 
       {(mode === "case" || mode === "confirm") && (
         <div
