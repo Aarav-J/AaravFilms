@@ -489,22 +489,20 @@ export default function FilmRoom() {
 
   return (
     <main className="cinema">
-      {!(mode === "case" || mode === "confirm" || mode === "inserting") && (
-        <Suspense
-          fallback={
-            <div className="loading">Preparing the screening room...</div>
-          }
-        >
-          <Scene
-            films={catalogFilms}
-            mode={mode}
-            onSelect={select}
-            onPlayer={() => setMode("playing")}
-            onCatalog={() => setMode("catalog")}
-            onTickets={() => setMode("tickets")}
-          />
-        </Suspense>
-      )}
+      <Suspense
+        fallback={
+          <div className="loading">Preparing the screening room...</div>
+        }
+      >
+        <Scene
+          films={catalogFilms}
+          mode={mode}
+          onSelect={select}
+          onPlayer={() => setMode("playing")}
+          onCatalog={() => setMode("catalog")}
+          onTickets={() => setMode("tickets")}
+        />
+      </Suspense>
 
       {(mode === "case" || mode === "confirm" || mode === "inserting") && (
         <div
@@ -559,7 +557,7 @@ export default function FilmRoom() {
             ) : mode === "inserting" ? (
               <p className="disc-status">Moving disc to the TV player...</p>
             ) : (
-              <p className="disc-hint">Click the disc to play this memory.</p>
+              <p className="disc-hint">Click the disc</p>
             )}
           </section>
         </div>
