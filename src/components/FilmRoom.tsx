@@ -744,7 +744,6 @@ export default function FilmRoom() {
           >
             <div className="tv-glass">
               <div className="player-toolbar">
-                <span>●</span>
                 <button
                   className="eject-btn"
                   onClick={() => {
@@ -827,7 +826,6 @@ export default function FilmRoom() {
                 </div>
               ) : (
                 <article className="review">
-                  <span className="eyebrow">NOTES FROM THE COLLECTION</span>
                   <h1>{selected.title}</h1>
                   <p className="byline">
                     {selected.director} • {selected.year}
