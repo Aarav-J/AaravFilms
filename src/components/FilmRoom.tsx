@@ -501,11 +501,7 @@ export default function FilmRoom() {
 
   return (
     <main className="cinema">
-      <Suspense
-        fallback={
-          <div className="loading">Preparing the screening room...</div>
-        }
-      >
+      <Suspense fallback={null}>
         <Scene
           films={catalogFilms}
           mode={mode}

@@ -55,17 +55,6 @@ input:focus-visible {
   cursor: grab;
 }
 
-.loading {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: #f5e8d3;
-  background: #1a100c;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 nav {
   display: flex;
   gap: 8px;
