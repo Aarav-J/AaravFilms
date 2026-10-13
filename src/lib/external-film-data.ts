@@ -197,7 +197,9 @@ function csvRows(text: string): CsvRow[] {
 // The other files are read from the filesystem in local dev only;
 // their features (favorites, extended reviews) degrade gracefully without them.
 const EXPORT_ENV_VARS: Record<string, string> = {
-  'diary.csv': 'LETTERBOXD_DIARY_CSV',
+  'diary.csv':   'LETTERBOXD_DIARY_CSV',
+  'profile.csv': 'LETTERBOXD_PROFILE_CSV',
+  'watched.csv': 'LETTERBOXD_WATCHED_CSV',
 };
 
 async function readExportText(filename: string) {
