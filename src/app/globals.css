@@ -66,61 +66,6 @@ input:focus-visible {
   text-transform: uppercase;
 }
 
-.hud {
-  position: absolute;
-  inset: 0 0 auto;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 24px 34px;
-  pointer-events: none;
-  background: linear-gradient(rgb(20 11 7 / 0.92), rgb(20 11 7 / 0));
-}
-
-.hud > * {
-  pointer-events: auto;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.monogram {
-  display: grid;
-  width: 42px;
-  height: 42px;
-  place-items: center;
-  border: 1px solid rgb(242 202 142 / 0.38);
-  border-radius: 50%;
-  background: rgb(18 10 7 / 0.46);
-  color: #e9c58b;
-  font: 700 12px Arial, sans-serif;
-  letter-spacing: 0.08em;
-}
-
-.brand strong,
-.brand small {
-  display: block;
-}
-
-.brand strong {
-  color: #f8e8cf;
-  font-size: 18px;
-  letter-spacing: 0.01em;
-  text-shadow: 0 2px 16px rgb(0 0 0 / 0.6);
-}
-
-.brand small {
-  margin-top: 4px;
-  color: #d8b987;
-  font: 9px Arial, sans-serif;
-  letter-spacing: 0.22em;
-}
-
 nav {
   display: flex;
   gap: 8px;
@@ -154,48 +99,7 @@ nav button:hover,
   transform: translateY(-1px);
 }
 
-.room-caption {
-  position: absolute;
-  left: 34px;
-  bottom: 30px;
-  z-index: 12;
-  max-width: 360px;
-  color: #f4dfbd;
-  text-shadow: 0 2px 18px rgb(0 0 0 / 0.8);
-  pointer-events: none;
-}
 
-.room-caption span,
-.eyebrow {
-  color: #e3b874;
-  font: 700 10px Arial, sans-serif;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-}
-
-.room-caption p {
-  margin: 9px 0 0;
-  color: #f7e8d1;
-  font-size: 17px;
-  line-height: 1.35;
-}
-
-
-.camera-hud {
-  position: fixed;
-  top: 64px;
-  right: 18px;
-  z-index: 20;
-  padding: 6px 11px;
-  background: rgb(10 7 4 / 0.72);
-  border: 1px solid rgb(239 193 128 / 0.3);
-  color: #e3b874;
-  font: 700 11px monospace;
-  letter-spacing: 0.12em;
-  backdrop-filter: blur(6px);
-  pointer-events: none;
-  white-space: nowrap;
-}
 
 .hover-label {
   min-width: 132px;
@@ -992,11 +896,6 @@ nav button:hover,
 }
 
 @media (max-width: 800px) {
-  .hud {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: 18px;
-  }
 
   nav {
     flex-wrap: wrap;
@@ -1007,11 +906,6 @@ nav button:hover,
     font-size: 10px;
   }
 
-  .room-caption {
-    left: 18px;
-    bottom: 18px;
-    max-width: calc(100% - 36px);
-  }
 
 
   .disc-select {
@@ -1091,13 +985,6 @@ nav button:hover,
   }
 }
 
-/* Keep the room primary. On small screens controls remain reachable without covering the collection. */
-@media (max-width: 600px) {
-  .hud { padding: 18px 16px; gap: 16px; flex-wrap: wrap; }
-  .hud nav { width: 100%; gap: 6px; }
-  .hud nav button { flex: 1; padding: 10px 5px; font-size: 9px; }
-  .room-caption { left: 18px; bottom: 24px; max-width: 290px; }
-}
 /* Keyboard/touch affordances attached to the actual journal furniture. */
 .room-object-action {
   min-width: 118px;

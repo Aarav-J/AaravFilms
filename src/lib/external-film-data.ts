@@ -309,12 +309,14 @@ async function buildExportFilms(): Promise<ExportBuild | null> {
   }
 
   const entriesById: Record<string, LetterboxdEntry[]> = {};
-  const films = Object.values(grouped).map((group, index) => {
+  const filmsRaw = Object.values(grouped).map((group, index) => {
     const seed = seedByTitleYear[`${group.title.toLowerCase()}-${group.year}`];
     const favorite = favoriteByTitleYear[`${group.title.toLowerCase()}-${group.year}`];
     const id = seed?.id ?? `${slugify(group.title)}-${group.year || index}`;
     const colors = seed ? { color: seed.color, accent: seed.accent } : colorPair(`${group.title}-${group.year}`);
-    entriesById[id] = group.entries.sort((left, right) => Date.parse(right.watchedDate ?? '') - Date.parse(left.watchedDate ?? ''));
+    const sortedEntries = group.entries.sort((left, right) => Date.parse(right.watchedDate ?? '') - Date.parse(left.watchedDate ?? ''));
+    entriesById[id] = [...(entriesById[id] ?? []), ...sortedEntries]
+      .sort((left, right) => Date.parse(right.watchedDate ?? '') - Date.parse(left.watchedDate ?? ''));
 
     return {
       ...(seed ?? {}),
@@ -335,6 +337,24 @@ async function buildExportFilms(): Promise<ExportBuild | null> {
       letterboxd: { url: group.link, entries: entriesById[id] }
     } satisfies Film;
   });
+
+  // Merge any films that resolved to the same ID (e.g. two diary-grouped
+  // entries both matching the same seed), keeping the richer merged viewings.
+  const seenIds = new Map<string, Film>();
+  for (const film of filmsRaw) {
+    const existing = seenIds.get(film.id);
+    if (existing) {
+      const mergedEntries = entriesById[film.id];
+      seenIds.set(film.id, {
+        ...existing,
+        viewings: mergedEntries.map(viewingFromEntry),
+        letterboxd: { url: existing.letterboxd?.url ?? '', entries: mergedEntries }
+      });
+    } else {
+      seenIds.set(film.id, film);
+    }
+  }
+  const films = Array.from(seenIds.values());
 
   // Oldest first so the most recently watched film sits at the end of the
   // filled section, right beside the empty shelf space.

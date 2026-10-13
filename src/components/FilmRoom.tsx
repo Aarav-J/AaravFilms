@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { films as seedFilms, type Film, type Viewing } from "@/data/films";
 import ReferenceRoom, { BAY_CAPACITY } from "./ReferenceRoom";
 import { useFilmPosterTexture } from "./useFilmPosterTexture";
+import { useSounds } from "./useSounds";
 
 type Mode =
   | "room"
@@ -212,10 +213,6 @@ function CameraRig({
     camera.position.lerp(desired, 1 - Math.exp(-dt * 3));
     target.lerp(look, 1 - Math.exp(-dt * 3));
     camera.lookAt(target);
-    // Update HUD imperatively — no re-render cost.
-    const hud = document.getElementById("camera-hud");
-    if (hud)
-      hud.textContent = `zoom ${zoom.current.toFixed(2)}  ·  pan ${dragAngle.current.toFixed(2)}`;
   });
   return null;
 }
@@ -364,6 +361,8 @@ export default function FilmRoom() {
   const [genreFilter, setGenreFilter] = useState("all");
   const [ticketQuery, setTicketQuery] = useState("");
   const [ticketSort, setTicketSort] = useState<TicketSort>("newest");
+  const sfx = useSounds();
+
 
   const allTickets: TicketEntry[] = useMemo(
     () =>
@@ -428,6 +427,7 @@ export default function FilmRoom() {
   const viewing = selected.viewings[watch];
 
   function select(film: Film, index = 0) {
+    sfx.tapePull();
     setSelected(film);
     setWatch(index);
     setMode("case");
@@ -472,8 +472,9 @@ export default function FilmRoom() {
 
   useEffect(() => {
     if (mode !== "inserting") return;
-    const timeout = window.setTimeout(() => setMode("playing"), 900);
-    return () => window.clearTimeout(timeout);
+    const crt = window.setTimeout(() => sfx.crtOn(), 700);
+    const flip = window.setTimeout(() => setMode("playing"), 900);
+    return () => { window.clearTimeout(crt); window.clearTimeout(flip); };
   }, [mode]);
 
   return (
@@ -495,30 +496,6 @@ export default function FilmRoom() {
         </Suspense>
       )}
 
-      <header className="hud">
-        <div className="brand">
-          <span className="monogram">AF</span>
-          <span>
-            <strong>Aarav's Films</strong>
-            <small>A PERSONAL FILM JOURNAL</small>
-          </span>
-        </div>
-        <nav>
-          <button onClick={() => setMode("catalog")}>CARD CATALOG</button>
-          <button onClick={() => setMode("tickets")}>TICKET BOX</button>
-          <button onClick={() => setMode("room")}>THE ROOM</button>
-        </nav>
-      </header>
-
-      {mode === "room" && (
-        <div className="room-caption">
-          <span>THE ROOM • {catalogFilms.length} FILMS</span>
-          <p>A shelf of films. A box of memories. Pick a labeled tape, or open the card catalog and ticket box on the left.</p>
-        </div>
-      )}
-      {mode === "room" && (
-        <div id="camera-hud" className="camera-hud" aria-hidden="true" />
-      )}
 
       {(mode === "case" || mode === "confirm" || mode === "inserting") && (
         <div
@@ -551,7 +528,7 @@ export default function FilmRoom() {
               <DiscViewer
                 film={selected}
                 inserting={mode === "inserting"}
-                onDiscClick={() => setMode("confirm")}
+                onDiscClick={() => { sfx.discClick(); setMode("confirm"); }}
               />
             </div>
             {mode === "confirm" ? (
@@ -561,7 +538,7 @@ export default function FilmRoom() {
                   <button onClick={() => setMode("case")}>CANCEL</button>
                   <button
                     className="primary"
-                    onClick={() => setMode("inserting")}
+                    onClick={() => { sfx.insert(); setMode("inserting"); }}
                   >
                     INSERT DISC
                   </button>
@@ -752,7 +729,7 @@ export default function FilmRoom() {
                 </span>
                 <button
                   className="eject-btn"
-                  onClick={() => setMode("case")}
+                  onClick={() => { sfx.eject(); setMode("case"); }}
                   aria-label="Eject disc"
                 >
                   <span className="eject-icon" aria-hidden="true" />
