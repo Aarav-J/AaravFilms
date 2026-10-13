@@ -336,8 +336,20 @@ function Scene({
         distance={12}
       />
       {/* Left-side fill lights so the far bookshelf and journal furniture stay readable */}
-      <pointLight position={[-8, 4.2, 1.5]} intensity={22} color="#d4a97a" distance={14} decay={2} />
-      <pointLight position={[-4, 3.6, 3.8]} intensity={12} color="#c9b48a" distance={10} decay={2} />
+      <pointLight
+        position={[-8, 4.2, 1.5]}
+        intensity={22}
+        color="#d4a97a"
+        distance={14}
+        decay={2}
+      />
+      <pointLight
+        position={[-4, 3.6, 3.8]}
+        intensity={12}
+        color="#c9b48a"
+        distance={10}
+        decay={2}
+      />
       <CameraRig mode={mode} dragAngle={dragAngle} zoom={zoom} films={films} />
       <DragLook dragAngle={dragAngle} zoom={zoom} />
       <ReferenceRoom
@@ -364,7 +376,6 @@ export default function FilmRoom() {
   const [ticketQuery, setTicketQuery] = useState("");
   const [ticketSort, setTicketSort] = useState<TicketSort>("newest");
   const sfx = useSounds();
-
 
   const allTickets: TicketEntry[] = useMemo(
     () =>
@@ -449,7 +460,6 @@ export default function FilmRoom() {
     setReady(true);
   }
 
-
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.key === "Escape") back();
@@ -462,7 +472,10 @@ export default function FilmRoom() {
     if (mode !== "inserting") return;
     const crt = window.setTimeout(() => sfx.crtOn(), 700);
     const flip = window.setTimeout(() => setMode("playing"), 900);
-    return () => { window.clearTimeout(crt); window.clearTimeout(flip); };
+    return () => {
+      window.clearTimeout(crt);
+      window.clearTimeout(flip);
+    };
   }, [mode]);
 
   if (!ready) {
@@ -493,7 +506,6 @@ export default function FilmRoom() {
         </Suspense>
       )}
 
-
       {(mode === "case" || mode === "confirm" || mode === "inserting") && (
         <div
           className="case-shade"
@@ -514,9 +526,6 @@ export default function FilmRoom() {
             >
               ×
             </button>
-            <span className="eyebrow">
-              PULLED FROM THE SHELF • {selected.spine}
-            </span>
             <h1 id="case-heading">{selected.title}</h1>
             <p>
               {selected.director} • {selected.year} • {selected.genre}
@@ -525,7 +534,10 @@ export default function FilmRoom() {
               <DiscViewer
                 film={selected}
                 inserting={mode === "inserting"}
-                onDiscClick={() => { sfx.discClick(); setMode("confirm"); }}
+                onDiscClick={() => {
+                  sfx.discClick();
+                  setMode("confirm");
+                }}
               />
             </div>
             {mode === "confirm" ? (
@@ -535,7 +547,10 @@ export default function FilmRoom() {
                   <button onClick={() => setMode("case")}>CANCEL</button>
                   <button
                     className="primary"
-                    onClick={() => { sfx.insert(); setMode("inserting"); }}
+                    onClick={() => {
+                      sfx.insert();
+                      setMode("inserting");
+                    }}
                   >
                     INSERT DISC
                   </button>
@@ -726,7 +741,10 @@ export default function FilmRoom() {
                 </span>
                 <button
                   className="eject-btn"
-                  onClick={() => { sfx.eject(); setMode("case"); }}
+                  onClick={() => {
+                    sfx.eject();
+                    setMode("case");
+                  }}
                   aria-label="Eject disc"
                 >
                   <span className="eject-icon" aria-hidden="true" />

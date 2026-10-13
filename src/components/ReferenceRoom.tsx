@@ -186,13 +186,27 @@ function Gremlin() {
     </group>)}
   </group>;
 }
-function WallPoster({ film, position }: { film: Film; position: [number, number, number] }) {
+function WallPoster({ film, position, onSelect }: { film: Film; position: [number, number, number]; onSelect: (film: Film) => void }) {
   const map = useFilmPosterTexture(film);
+  const [hover, setHover] = useState(false);
+  const ref = useRef<THREE.Group>(null);
   const w = 1.02, h = 1.53;
-  return <group position={position}>
-    <mesh position={[0, 0, -.045]} castShadow receiveShadow><boxGeometry args={[w + .1, h + .1, .05]} /><meshStandardMaterial color="#1a1410" roughness={.85} /></mesh>
-    <mesh position={[0, 0, -.015]}><boxGeometry args={[w + .03, h + .03, .01]} /><meshStandardMaterial color="#cbb78a" metalness={.3} roughness={.5} /></mesh>
+  useFrame((_, dt) => {
+    if (!ref.current) return;
+    ref.current.position.z = THREE.MathUtils.damp(ref.current.position.z, position[2] + (hover ? .18 : 0), 10, dt);
+    ref.current.rotation.z = THREE.MathUtils.damp(ref.current.rotation.z, hover ? .025 : 0, 8, dt);
+  });
+  return <group
+    ref={ref}
+    position={position}
+    onClick={e => { e.stopPropagation(); onSelect(film); }}
+    onPointerOver={e => { e.stopPropagation(); setHover(true); document.body.style.cursor = 'pointer'; }}
+    onPointerOut={() => { setHover(false); document.body.style.cursor = 'grab'; }}
+  >
+    <mesh position={[0, 0, -.045]} castShadow receiveShadow><boxGeometry args={[w + .1, h + .1, .05]} /><meshStandardMaterial color={hover ? "#241915" : "#1a1410"} roughness={.85} /></mesh>
+    <mesh position={[0, 0, -.015]}><boxGeometry args={[w + .03, h + .03, .01]} /><meshStandardMaterial color={hover ? "#e3ca96" : "#cbb78a"} metalness={.3} roughness={.5} /></mesh>
     <mesh castShadow><planeGeometry args={[w, h]} /><meshStandardMaterial map={map} roughness={.5} side={THREE.DoubleSide} /></mesh>
+    {hover && <Html position={[0, -.92, .08]} center distanceFactor={5.5}><div className="hover-label">{film.title}<small>Click to view watches</small></div></Html>}
   </group>;
 }
 export default function ReferenceRoom({ films, onSelect, active, onPlayer, onCatalog, onTickets }: { films: Film[]; onSelect: (film: Film) => void; active: boolean; onPlayer: () => void; onCatalog: () => void; onTickets: () => void }) {
@@ -209,7 +223,7 @@ export default function ReferenceRoom({ films, onSelect, active, onPlayer, onCat
     <Box position={[-5.7 - (bays - 1) * 7.25, 4, 3]} size={[.18, 10, 8]} material={wall} />
     {Array.from({ length: 27 + (bays - 1) * 11 }, (_, i) => <Box key={i} position={[-8 - (bays - 1) * 7.7 + i * .7, -.07, 3]} size={[.684, .1, 18]} material={wood} />)}
     {Array.from({ length: bays }, (_, bay) => <ShelfBay key={bay} entries={films.slice(bay * BAY_CAPACITY, (bay + 1) * BAY_CAPACITY)} bay={bay} onSelect={onSelect} />)}
-    {wallFilms.map((film, i) => <WallPoster key={film.id} film={film} position={[3.8 + i * 1.35, 5.3 + (i % 2) * .15, -.85]} />)}
+    {wallFilms.map((film, i) => <WallPoster key={film.id} film={film} position={[3.8 + i * 1.35, 5.3 + (i % 2) * .15, -.85]} onSelect={onSelect} />)}
     <JournalFurniture bays={bays} filmCount={films.length} ticketCount={films.reduce((n, film) => n + film.viewings.length, 0)} onCatalog={onCatalog} onTickets={onTickets} />
     <ChessTable />
     <Television active={active} onClick={onPlayer} /><ReelLamp /><Plush /><Rug /><Cables />
