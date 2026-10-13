@@ -98,7 +98,7 @@ async function searchTmdbFilm(title: string, year: number): Promise<number | nul
   url.searchParams.set('query', title);
   url.searchParams.set('include_adult', 'false');
   url.searchParams.set('language', 'en-US');
-  if (Number.isFinite(year)) url.searchParams.set('year', String(year));
+  if (Number.isFinite(year) && year > 0) url.searchParams.set('year', String(year));
   withApiKey(url);
 
   const response = await fetch(url, { headers: tmdbHeaders(), next: { revalidate: 60 * 60 * 24 } });
@@ -106,8 +106,8 @@ async function searchTmdbFilm(title: string, year: number): Promise<number | nul
   const search = await response.json() as TmdbSearchResponse;
   const results = search.results ?? [];
   if (results.length === 0) return null;
-  // Prefer the result whose release year matches; fall back to highest-popularity hit.
-  const yearMatch = results.find((r) => r.release_date?.startsWith(String(year)));
+  // Prefer the result whose release year matches when we know one; fall back to highest-popularity hit.
+  const yearMatch = year > 0 ? results.find((r) => r.release_date?.startsWith(String(year))) : undefined;
   return (yearMatch ?? results.reduce((best, r) => (r.popularity ?? 0) > (best.popularity ?? 0) ? r : best))?.id ?? null;
 }
 
@@ -292,6 +292,85 @@ function viewingFromEntry(entry: LetterboxdEntry): Viewing {
   };
 }
 
+function latestFilmTime(film: Film) {
+  return Math.max(...film.viewings.map((viewing) => Date.parse(viewing.date)).filter(Number.isFinite), 0);
+}
+
+function letterboxdSlugFromLink(link: string) {
+  return link.match(/\/film\/([^/?#]+)/)?.[1] ?? '';
+}
+
+function entryKey(entry: LetterboxdEntry) {
+  const slug = letterboxdSlugFromLink(entry.link);
+  return `${slug || entry.title.toLowerCase()}|${entry.watchedDate ?? ''}|${entry.rating ?? ''}`;
+}
+
+function hasEntry(entries: LetterboxdEntry[], candidate: LetterboxdEntry) {
+  const key = entryKey(candidate);
+  return entries.some((entry) =>
+    entryKey(entry) === key ||
+    (entry.title.toLowerCase() === candidate.title.toLowerCase() && entry.watchedDate === candidate.watchedDate)
+  );
+}
+
+function matchesRssEntry(film: Film, entry: LetterboxdEntry) {
+  const slug = letterboxdSlugFromLink(entry.link);
+  if (slug && film.letterboxdSlug === slug) return true;
+  if (slug && film.letterboxd?.url.includes(`/film/${slug}/`)) return true;
+  return film.title.toLowerCase() === entry.title.toLowerCase();
+}
+
+function mergeRssEntriesIntoFilms(films: Film[], rssEntries: LetterboxdEntry[]) {
+  if (rssEntries.length === 0) return films;
+  const merged = films.map((film) => ({
+    ...film,
+    viewings: [...film.viewings],
+    letterboxd: film.letterboxd ? { ...film.letterboxd, entries: [...film.letterboxd.entries] } : undefined
+  }));
+
+  for (const entry of rssEntries) {
+    const slug = letterboxdSlugFromLink(entry.link);
+    const existing = merged.find((film) => matchesRssEntry(film, entry));
+    if (existing) {
+      const entries = existing.letterboxd?.entries ?? [];
+      if (hasEntry(entries, entry)) continue;
+      const mergedEntries = [...entries, entry]
+        .sort((left, right) => Date.parse(right.watchedDate ?? '') - Date.parse(left.watchedDate ?? ''));
+      existing.letterboxd = {
+        url: existing.letterboxd?.url || (slug ? `https://letterboxd.com/film/${slug}/` : entry.link),
+        entries: mergedEntries
+      };
+      existing.viewings = entries.length > 0
+        ? mergedEntries.map(viewingFromEntry)
+        : [...existing.viewings, viewingFromEntry(entry)];
+      continue;
+    }
+
+    const id = `${slug || slugify(entry.title)}-rss`;
+    const colors = colorPair(`${entry.title}-rss`);
+    merged.push({
+      id,
+      title: entry.title,
+      year: 0,
+      director: 'Letterboxd RSS',
+      genre: 'Diary',
+      color: colors.color,
+      accent: colors.accent,
+      spine: String(merged.length + 1).padStart(2, '0'),
+      poster: PLACEHOLDER_POSTER,
+      tmdbId: null,
+      letterboxdSlug: slug,
+      review: [],
+      viewings: [viewingFromEntry(entry)],
+      letterboxd: { url: slug ? `https://letterboxd.com/film/${slug}/` : entry.link, entries: [entry] }
+    });
+  }
+
+  return merged
+    .sort((left, right) => latestFilmTime(left) - latestFilmTime(right))
+    .map((film, index) => ({ ...film, spine: String(index + 1).padStart(2, '0') }));
+}
+
 async function buildExportFilms(): Promise<ExportBuild | null> {
   const diaryRows = await readExportCsv('diary.csv');
   if (diaryRows.length === 0) return null;
@@ -380,10 +459,8 @@ async function buildExportFilms(): Promise<ExportBuild | null> {
   }
   const films = Array.from(seenIds.values());
 
-  // Oldest first so the most recently watched film sits at the end of the
-  // filled section, right beside the empty shelf space.
   const filmsByWatched = films
-    .sort((left, right) => Math.max(...left.viewings.map((viewing) => Date.parse(viewing.date)).filter(Number.isFinite), 0) - Math.max(...right.viewings.map((viewing) => Date.parse(viewing.date)).filter(Number.isFinite), 0))
+    .sort((left, right) => latestFilmTime(left) - latestFilmTime(right))
     .map((film, index) => ({ ...film, spine: String(index + 1).padStart(2, '0') }));
 
   return { films: filmsByWatched, entriesById, rows: diaryRows.length };
@@ -419,10 +496,14 @@ async function hydrateTmdb(film: Film) {
   };
 }
 
-function entriesForFilm(entries: LetterboxdEntry[], film: Film) {
-  if (!film.letterboxdSlug) return [];
-  const filmPath = `/film/${film.letterboxdSlug}/`;
-  return entries.filter((entry) => entry.link.includes(filmPath));
+function withLetterboxdFallback(film: Film): Film {
+  return {
+    ...film,
+    letterboxd: film.letterboxd ?? {
+      url: film.letterboxdSlug ? `https://letterboxd.com/film/${film.letterboxdSlug}/` : '',
+      entries: []
+    }
+  };
 }
 
 export async function getMergedFilms(): Promise<FilmsApiResponse> {
@@ -440,18 +521,6 @@ export async function getMergedFilms(): Promise<FilmsApiResponse> {
     ? { state: 'configured', rows: exportBuild.rows, films: exportBuild.films.length }
     : { state: 'missing-config', rows: 0, films: 0, message: `Add ${LETTERBOXD_EXPORT_DIR}/diary.csv to import the full diary.` };
 
-  let hydratedFilms = baseFilms;
-  if (hasTmdbCredentials()) {
-    hydratedFilms = await mapWithConcurrency(baseFilms, 6, async (film) => {
-      try {
-        return await hydrateTmdb(film);
-      } catch (error) {
-        tmdbState = { state: 'error', message: error instanceof Error ? error.message : 'TMDB request failed.' };
-        return film;
-      }
-    });
-  }
-
   let rssEntries: LetterboxdEntry[] = [];
   if (letterboxdUsername) {
     try {
@@ -461,14 +530,21 @@ export async function getMergedFilms(): Promise<FilmsApiResponse> {
     }
   }
 
-  return {
-    films: hydratedFilms.map((film) => ({
-      ...film,
-      letterboxd: film.letterboxd ?? {
-        url: film.letterboxdSlug ? `https://letterboxd.com/film/${film.letterboxdSlug}/` : '',
-        entries: entriesForFilm(rssEntries, film)
+  const mergedFilms = mergeRssEntriesIntoFilms(baseFilms, rssEntries);
+  let hydratedFilms = mergedFilms;
+  if (hasTmdbCredentials()) {
+    hydratedFilms = await mapWithConcurrency(mergedFilms, 6, async (film) => {
+      try {
+        return await hydrateTmdb(film);
+      } catch (error) {
+        tmdbState = { state: 'error', message: error instanceof Error ? error.message : 'TMDB request failed.' };
+        return film;
       }
-    })),
+    });
+  }
+
+  return {
+    films: hydratedFilms.map(withLetterboxdFallback),
     sources: {
       tmdb: tmdbState,
       letterboxd: letterboxdState,
