@@ -1,3 +1,4 @@
+import { gunzipSync } from 'node:zlib';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { films as seedFilms, type Film, type LetterboxdEntry, type TmdbFilmData, type Viewing } from '@/data/films';
@@ -192,22 +193,26 @@ function csvRows(text: string): CsvRow[] {
   return records.map((record) => Object.fromEntries(headers.map((header, index) => [header, record[index] ?? ''])));
 }
 
-// On Vercel (or any host where letterboxd_export/ is absent), set
-// LETTERBOXD_DIARY_CSV to the base64-encoded content of diary.csv.
-// The other files are read from the filesystem in local dev only;
-// their features (favorites, extended reviews) degrade gracefully without them.
-const EXPORT_ENV_VARS: Record<string, string> = {
-  'diary.csv':   'LETTERBOXD_DIARY_CSV',
-  'profile.csv': 'LETTERBOXD_PROFILE_CSV',
-  'watched.csv': 'LETTERBOXD_WATCHED_CSV',
-};
+// On Vercel set LETTERBOXD_EXPORT_BUNDLE to the output of:
+//   node scripts/bundle-export.mjs
+// That script gzips all letterboxd_export/*.csv files into one base64 blob.
+// Local dev falls back to reading the files directly from the filesystem.
+let _bundle: Record<string, string> | null = null;
+function exportBundle(): Record<string, string> {
+  if (_bundle) return _bundle;
+  const raw = process.env.LETTERBOXD_EXPORT_BUNDLE;
+  if (!raw) return {};
+  try {
+    _bundle = JSON.parse(gunzipSync(Buffer.from(raw, 'base64')).toString('utf8'));
+    return _bundle ?? {};
+  } catch {
+    return {};
+  }
+}
 
 async function readExportText(filename: string) {
-  const envVar = EXPORT_ENV_VARS[filename];
-  if (envVar) {
-    const value = process.env[envVar];
-    if (value) return Buffer.from(value, 'base64').toString('utf8');
-  }
+  const bundle = exportBundle();
+  if (filename in bundle) return bundle[filename];
   try {
     return await readFile(path.join(process.cwd(), LETTERBOXD_EXPORT_DIR, filename), 'utf8');
   } catch {
