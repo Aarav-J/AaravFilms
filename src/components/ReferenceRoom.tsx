@@ -282,7 +282,7 @@ function shelfEntryIndex(slot: number, bay: number) {
   const col = slot % SHELF_COLUMNS;
   const startsBottom = bay % 2 === 0;
   const fillRow = startsBottom ? SHELF_ROWS - 1 - row : row;
-  const rowStartsLeft = startsBottom ? fillRow % 2 === 0 : fillRow % 2 === 1;
+  const rowStartsLeft = fillRow % 2 === 1;
   const fillCol = rowStartsLeft ? col : SHELF_COLUMNS - 1 - col;
   return fillRow * SHELF_COLUMNS + fillCol;
 }
