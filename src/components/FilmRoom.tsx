@@ -504,7 +504,7 @@ export default function FilmRoom() {
         />
       </Suspense>
 
-      {(mode === "case" || mode === "confirm" || mode === "inserting") && (
+      {(mode === "case" || mode === "confirm") && (
         <div
           className="case-shade"
           onClick={(event) =>
@@ -531,7 +531,7 @@ export default function FilmRoom() {
             <div className="disc-stage">
               <DiscViewer
                 film={selected}
-                inserting={mode === "inserting"}
+                inserting={false}
                 onDiscClick={() => {
                   sfx.discClick();
                   setMode("confirm");
@@ -554,8 +554,6 @@ export default function FilmRoom() {
                   </button>
                 </div>
               </div>
-            ) : mode === "inserting" ? (
-              <p className="disc-status">Moving disc to the TV player...</p>
             ) : (
               <p className="disc-hint">Click the disc</p>
             )}
