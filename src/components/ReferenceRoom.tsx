@@ -280,12 +280,11 @@ function CoverTape({
 function shelfEntryIndex(slot: number, bay: number) {
   const row = Math.floor(slot / SHELF_COLUMNS);
   const col = slot % SHELF_COLUMNS;
-  if (bay % 2 === 0) {
-    // TV-side bay: oldest starts at bottom-left, then fills upward.
-    return (SHELF_ROWS - 1 - row) * SHELF_COLUMNS + col;
-  }
-  // Next bay flips orientation: oldest starts at top-right, then fills downward.
-  return row * SHELF_COLUMNS + (SHELF_COLUMNS - 1 - col);
+  const startsBottom = bay % 2 === 0;
+  const fillRow = startsBottom ? SHELF_ROWS - 1 - row : row;
+  const rowStartsLeft = startsBottom ? fillRow % 2 === 0 : fillRow % 2 === 1;
+  const fillCol = rowStartsLeft ? col : SHELF_COLUMNS - 1 - col;
+  return fillRow * SHELF_COLUMNS + fillCol;
 }
 
 function ShelfBay({
